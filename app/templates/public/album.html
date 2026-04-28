@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ album.title }} — {{ site_title }}{% endblock %}
+{% block og_title %}{{ album.title }}{% endblock %}
+
+{% block content %}
+
+<!-- Breadcrumb -->
+<div class="breadcrumb">
+  <a href="/">HOME</a>
+  {% for crumb in breadcrumb %}
+    <span class="breadcrumb-sep">/</span>
+    <a href="/a/{{ crumb.slug }}">{{ crumb.title | upper }}</a>
+  {% endfor %}
+  <span class="breadcrumb-sep">/</span>
+  <span>{{ album.title | upper }}</span>
+</div>
+
+<!-- Album header -->
+<div class="album-header">
+  <h1 class="album-title">{{ album.title }}</h1>
+  {% if album.description %}
+    <div class="album-desc">{{ album.description }}</div>
+  {% endif %}
+  <div class="album-meta">
+    <span>{{ media_items | length }} file{% if media_items | length != 1 %}s{% endif %}</span>
+    {% if sub_albums %}<span>{{ sub_albums | length }} sub-album{% if sub_albums | length != 1 %}s{% endif %}</span>{% endif %}
+    {% if is_shared | default(false) %}<span style="color:var(--accent);">□ CLIENT VIEW</span>{% endif %}
+  </div>
+</div>
+
+<!-- Sub-albums -->
+{% if sub_albums %}
+<div class="sub-albums-section">
+  <div class="sub-albums-label">// SUB-ALBUMS</div>
+  <div class="album-grid">
+    {% for sub in sub_albums %}
+    <a href="/a/{{ sub.slug }}" class="album-card">
+      {% if sub.cover_thumb_path %}
+        <img src="/media/{{ sub.cover_thumb_path }}" alt="{{ sub.title }}" loading="lazy">
+      {% else %}
+        <div class="album-card-no-cover">
+          <span class="album-icon">□</span>
+          <span style="font-size:0.75rem;">{{ sub.title | upper }}</span>
+        </div>
+      {% endif %}
+      <div class="album-card-overlay">
+        <div class="album-card-title">{{ sub.title }}</div>
+        <div class="album-card-count">{{ sub.media_items | length }} files</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Media grid -->
+{% if media_items %}
+<div class="section-title">
+  <span>// PHOTOS</span><span>{{ media_items | length }}</span>
+</div>
+
+<div class="media-grid" id="mediaGrid">
+  {% for item in media_items %}
+  <div class="media-thumb lazy-item"
+       data-index="{{ loop.index0 }}"
+       onclick="openLightbox({{ loop.index0 }})">
+    {% if item.thumb_path %}
+      <img src="/media/{{ item.thumb_path }}"
+           alt="{{ item.original_filename }}"
+           loading="lazy">
+    {% else %}
+      <div class="media-thumb-placeholder">{{ item.media_type | upper }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% include "public/_lightbox.html" %}
+
+{% else %}
+<div style="padding:3rem; text-align:center; color:#333; letter-spacing:0.1em;">
+  [ NO PHOTOS IN THIS ALBUM ]
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const MEDIA = [
+  {% for item in media_items %}
+  { id: {{ item.id }},
+    webPath:  "{{ item.web_path or '' }}",
+    name:     "{{ item.original_filename | replace('"', '') }}",
+    w:        {{ item.width or 0 }},
+    h:        {{ item.height or 0 }} },
+  {% endfor %}
+];
+</script>
+{% endblock %}

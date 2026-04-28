@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ site_title }}{% endblock %}
+
+{% block content %}
+
+{% if featured_album and media_items %}
+  <!-- Featured album: show its media grid directly on home -->
+  <div class="album-header">
+    <h1 class="album-title">{{ featured_album.title }}</h1>
+    {% if featured_album.description %}
+    <div class="album-desc">{{ featured_album.description }}</div>
+    {% endif %}
+    <div class="album-meta">
+      <span>{{ media_items | length }} file{% if media_items | length != 1 %}s{% endif %}</span>
+    </div>
+  </div>
+
+  <div class="media-grid" id="mediaGrid">
+    {% for item in media_items %}
+    <div class="media-thumb"
+         data-index="{{ loop.index0 }}"
+         onclick="openLightbox({{ loop.index0 }})">
+      {% if item.thumb_path %}
+        <img src="/media/{{ item.thumb_path }}"
+             alt="{{ item.original_filename }}"
+             loading="lazy">
+      {% else %}
+        <div class="media-thumb-placeholder">{{ item.media_type | upper }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Lightbox -->
+  {% include "public/_lightbox.html" %}
+
+  {% block extra_js %}
+  <script>
+  const MEDIA = [
+    {% for item in media_items %}
+    { id: {{ item.id }}, webPath: "{{ item.web_path or '' }}",
+      origPath: "{{ item.original_path or '' }}", name: "{{ item.original_filename }}" },
+    {% endfor %}
+  ];
+  </script>
+  {% endblock %}
+
+{% elif albums %}
+  <!-- Album grid -->
+  <div class="section-title">
+    <span>// GALLERY</span>
+    <span>{{ albums | length }} album{% if albums | length != 1 %}s{% endif %}</span>
+  </div>
+
+  <div class="album-grid">
+    {% for album in albums %}
+    <a href="/a/{{ album.slug }}" class="album-card">
+      {% if album.cover_thumb_path %}
+        <img src="/media/{{ album.cover_thumb_path }}"
+             alt="{{ album.title }}" loading="lazy">
+      {% else %}
+        <div class="album-card-no-cover">
+          <span class="album-icon">□</span>
+          <span style="font-size:0.75rem; letter-spacing:0.08em;">{{ album.title | upper }}</span>
+        </div>
+      {% endif %}
+      <div class="album-card-overlay">
+        <div class="album-card-title">{{ album.title }}</div>
+        <div class="album-card-count">{{ album.media_items | length }} file{% if album.media_items | length != 1 %}s{% endif %}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+{% else %}
+  <div style="text-align:center; padding:5rem 1rem;">
+    <div style="font-size:3rem; color:var(--border); margin-bottom:1rem;">[ GALLERY EMPTY ]</div>
+    <div style="font-size:0.9rem; color:#333; letter-spacing:0.1em;">
+      <a href="/admin" style="color:var(--accent);">Open admin panel</a> to add your first album.
+    </div>
+    <div style="margin-top:1rem;"><span class="blink" style="color:var(--border);">_</span></div>
+  </div>
+{% endif %}
+
+{% endblock %}

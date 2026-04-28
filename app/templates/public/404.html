@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}404 — {{ site_title }}{% endblock %}
+
+{% block content %}
+<div style="text-align:center; padding:6rem 1rem;">
+  <div style="font-size:5rem; color:var(--accent); text-shadow:0 0 20px var(--glow-a); line-height:1;">404</div>
+  <div style="font-size:1.75rem; margin:0.75rem 0; letter-spacing:0.08em;">[ PAGE NOT FOUND ]</div>
+  <div style="font-size:0.9rem; color:#333; margin-bottom:2rem; letter-spacing:0.06em;">
+    The file you requested does not exist in this terminal.
+  </div>
+  <a href="/" class="btn btn-primary">← RETURN HOME</a>
+  <div style="margin-top:2rem;"><span class="blink" style="color:var(--border);">_</span></div>
+</div>
+{% endblock %}

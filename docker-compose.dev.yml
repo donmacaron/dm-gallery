@@ -1,0 +1,23 @@
+# Development override — hot reload, no nginx, direct port access
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: "3.9"
+
+services:
+
+  app:
+    environment:
+      - DEBUG=true
+    volumes:
+      - ./app:/app/app          # Mount source code for hot reload
+      - ./data/media:/app/data/media
+      - ./data/db:/app/data/db
+      - ./data/zips:/app/data/zips
+      - ${ORIGINALS_PATH:-./data/originals}:/app/data/originals
+    ports:
+      - "8000:8000"             # Expose directly (no nginx in dev)
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  nginx:
+    profiles:
+      - production              # nginx only active in production profile

@@ -1,0 +1,40 @@
+{#
+  HTMX polling fragment: single job status card.
+  Called by GET /admin/api/jobs/{job_id}/fragment
+  Auto-polling stops when status = done | error.
+#}
+{% if job %}
+<div id="job-{{ job.id }}" class="job-item"
+  {% if job.status in ('pending', 'running') %}
+  hx-get="/admin/api/jobs/{{ job.id }}/fragment"
+  hx-trigger="every 2s"
+  hx-swap="outerHTML"
+  {% endif %}>
+
+  <div class="job-header">
+    <span class="job-name">
+      {% if media %}{{ media.original_filename }}{% else %}job:{{ job.id[:8] }}…{% endif %}
+    </span>
+    <span class="badge badge-{{ job.status }}">{{ job.status | upper }}</span>
+  </div>
+
+  {% if job.status == 'done' and media %}
+    <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.4rem;">
+      {% if media.thumb_path %}
+        <img src="/media/{{ media.thumb_path }}" style="width:40px;height:40px;object-fit:cover;border:1px solid var(--border);">
+      {% endif %}
+      <span style="font-size:0.72rem; color:var(--fg);">converted ✓</span>
+      {% if media.width and media.height %}
+        <span style="font-size:0.65rem; color:#333;">{{ media.width }}×{{ media.height }}</span>
+      {% endif %}
+    </div>
+  {% elif job.status == 'error' %}
+    <div style="font-size:0.72rem; color:#ff4444; margin-top:0.3rem;">! {{ job.error_message or 'Unknown error' }}</div>
+  {% else %}
+    <div class="progress-bar"><div class="progress-fill" style="width:{{ job.progress }}%"></div></div>
+  {% endif %}
+
+</div>
+{% else %}
+<div id="job-{{ job_id }}" style="font-size:0.75rem; color:#333;">job not found</div>
+{% endif %}

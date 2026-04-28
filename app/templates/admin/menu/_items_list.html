@@ -1,0 +1,45 @@
+{# Partial: menu item list. Used by index.html and HTMX move response. #}
+{% if items %}
+{% for item in items %}
+<div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem; border:1px solid var(--border); margin-bottom:3px; background:var(--dim2);">
+
+  <!-- Reorder buttons -->
+  <div style="display:flex; flex-direction:column; gap:1px;">
+    <button class="btn btn-sm" style="padding:0 5px; font-size:0.7rem; line-height:1;"
+            hx-post="/admin/menu/{{ item.id }}/move"
+            hx-vals='{"direction": "up"}'
+            hx-target="#menu-items-list"
+            hx-swap="innerHTML">▲</button>
+    <button class="btn btn-sm" style="padding:0 5px; font-size:0.7rem; line-height:1;"
+            hx-post="/admin/menu/{{ item.id }}/move"
+            hx-vals='{"direction": "down"}'
+            hx-target="#menu-items-list"
+            hx-swap="innerHTML">▼</button>
+  </div>
+
+  <!-- Label + target -->
+  <div style="flex:1; font-size:0.85rem;">
+    <span style="color:var(--fg);">{{ item.label }}</span>
+    <span style="font-size:0.65rem; color:#333; margin-left:0.5rem;">
+      {% if item.item_type == 'page' and item.page %}/p/{{ item.page.slug }}
+      {% elif item.item_type == 'album' and item.album %}/a/{{ item.album.slug }}
+      {% elif item.ext_url %}{{ item.ext_url[:30] }}…
+      {% endif %}
+    </span>
+  </div>
+
+  <!-- Visibility badge -->
+  <span class="badge {% if item.is_visible %}badge-public{% else %}badge-private{% endif %}"
+        style="font-size:0.6rem;">{% if item.is_visible %}ON{% else %}OFF{% endif %}</span>
+
+  <!-- Delete -->
+  <form action="/admin/menu/{{ item.id }}/delete" method="post"
+        onsubmit="return confirm('Remove menu item \'{{ item.label }}\'?')">
+    <button type="submit" class="btn btn-sm btn-danger" style="padding:0.1rem 0.4rem;">×</button>
+  </form>
+
+</div>
+{% endfor %}
+{% else %}
+<div style="font-size:0.8rem; color:#2a2a2a; padding:0.75rem 0;">No menu items yet. Add one on the right.</div>
+{% endif %}

@@ -1,0 +1,21 @@
+{# Dashboard widget: active jobs. No base template — HTMX fragment only. #}
+{% if jobs %}
+  {% for job in jobs %}
+  <div class="job-item"
+       hx-get="/admin/api/jobs/{{ job.id }}/fragment"
+       hx-trigger="every 3s"
+       hx-swap="outerHTML"
+       id="job-{{ job.id }}">
+    <div class="job-header">
+      <span class="job-name">{{ job.job_type }} │ {{ job.id[:8] }}…</span>
+      <span class="badge badge-{{ job.status }}">{{ job.status | upper }}</span>
+    </div>
+    {% if job.total_items > 0 %}
+    <div class="job-sub">{{ job.done_items }} / {{ job.total_items }}</div>
+    <div class="progress-bar"><div class="progress-fill" style="width:{{ job.progress }}%"></div></div>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% else %}
+  <div style="font-size:0.75rem; color:#1a1a1a; padding:0.5rem 0;">No active jobs.</div>
+{% endif %}

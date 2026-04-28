@@ -1,0 +1,51 @@
+# ═══════════════════════════════════════════
+# Don Macaron Gallery — Server Production
+# Traefik-integrated, originals on 1tb drive
+# ═══════════════════════════════════════════
+version: "3.9"
+
+services:
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # Processed media + thumbnails (local SSD)
+      - ./data/media:/app/data/media
+      # SQLite database (local SSD)
+      - ./data/db:/app/data/db
+      # Originals on 1TB drive
+      - /mnt/1tb-drive/dm-gallery-storage/originals:/app/data/originals
+      # Pre-built ZIPs on 1TB drive
+      - /mnt/1tb-drive/dm-gallery-storage/zips:/app/data/zips
+    networks:
+      - traefik_default
+      - gallery_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_default"
+      # HTTPS router
+      - "traefik.http.routers.dm-gallery1.rule=Host(`donmacaron.net`)"
+      - "traefik.http.routers.dm-gallery1.entrypoints=webs"
+      - "traefik.http.routers.dm-gallery1.tls.certresolver=myresolver"
+      - "traefik.http.services.dm-gallery1.loadbalancer.server.port=8000"
+      # HTTP → HTTPS redirect router
+      - "traefik.http.routers.dm-gallery2.rule=Host(`donmacaron.net`)"
+      - "traefik.http.routers.dm-gallery2.entrypoints=web"
+      - "traefik.http.routers.dm-gallery2.middlewares=redirect-to-https"
+      # Redirect middleware
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.port=443"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  traefik_default:
+    external: true
+  gallery_net:
+    driver: bridge

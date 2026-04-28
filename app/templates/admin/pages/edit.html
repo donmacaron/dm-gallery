@@ -1,0 +1,111 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{% if is_new %}New Page{% else %}{{ page.title }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<style>
+#editor-container {
+  background: #0c0c0c;
+  color: var(--fg);
+  font-family: var(--font);
+  border: 1px solid var(--border2);
+  min-height: 340px;
+}
+.ql-toolbar { background: #111; border-color: var(--border2) !important; }
+.ql-toolbar .ql-stroke { stroke: #444; }
+.ql-toolbar .ql-fill   { fill:   #444; }
+.ql-toolbar button:hover .ql-stroke { stroke: var(--fg); }
+.ql-toolbar button:hover .ql-fill   { fill:   var(--fg); }
+.ql-editor { min-height: 300px; font-family: 'Share Tech Mono', monospace; font-size: 1rem; }
+.ql-editor.ql-blank::before { color: #2a2a2a; font-style: normal; }
+.ql-container { border-color: var(--border2) !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>{% if is_new %}// NEW PAGE{% else %}// {{ page.title | upper }}{% endif %}</span>
+  <div style="display:flex; gap:0.5rem;">
+    {% if not is_new and page.is_published %}
+    <a href="/p/{{ page.slug }}" target="_blank" class="btn btn-sm">View ↗</a>
+    {% endif %}
+    <a href="/admin/pages" class="btn btn-sm">← Pages</a>
+  </div>
+</div>
+
+<form action="{% if is_new %}/admin/pages/create{% else %}/admin/pages/{{ page.id }}/update{% endif %}"
+      method="post" id="page-form" style="max-width:900px;">
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+    <div class="form-group">
+      <label class="form-label">Title *</label>
+      <input class="form-input" type="text" name="title"
+             value="{% if page %}{{ page.title }}{% endif %}" required autofocus>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Cover Image URL (optional)</label>
+      <input class="form-input" type="text" name="cover_url"
+             value="{% if page and page.cover_url %}{{ page.cover_url }}{% endif %}"
+             placeholder="https://...">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">Content</label>
+    <div id="editor-container"></div>
+  </div>
+
+  <input type="hidden" name="content_html"  id="content_html">
+  <input type="hidden" name="content_delta" id="content_delta">
+
+  <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-top:0.75rem;">
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+      <input type="checkbox" name="is_published" value="on"
+             {% if page and page.is_published %}checked{% endif %}>
+      Publish (visible on site)
+    </label>
+    <button type="submit" class="btn btn-primary">&gt; Save Page</button>
+    {% if not is_new %}
+    <form action="/admin/pages/{{ page.id }}/delete" method="post" style="display:inline;"
+          onsubmit="return confirm('Delete this page?')">
+      <button type="submit" class="btn btn-sm btn-danger">&times; Delete</button>
+    </form>
+    {% endif %}
+  </div>
+
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script>
+const quill = new Quill('#editor-container', {
+  theme: 'snow',
+  placeholder: 'Write your page content here…',
+  modules: {
+    toolbar: [
+      [{ header: [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['blockquote', 'code-block'],
+      ['link'],
+      ['clean']
+    ]
+  }
+});
+
+// Load existing delta on edit
+{% if not is_new and page and page.content_delta %}
+try {
+  const delta = {{ page.content_delta | safe }};
+  quill.setContents(delta);
+} catch(e) { console.warn('Could not load delta:', e); }
+{% endif %}
+
+// Populate hidden fields before submit
+document.getElementById('page-form').addEventListener('submit', function() {
+  document.getElementById('content_html').value  = quill.root.innerHTML;
+  document.getElementById('content_delta').value = JSON.stringify(quill.getContents());
+});
+</script>
+{% endblock %}

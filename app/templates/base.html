@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ site_title }}{% endblock %}</title>
+  <meta name="description" content="{{ site.get('site_tagline', '') }}">
+
+  <!-- Open Graph -->
+  <meta property="og:title"       content="{% block og_title %}{{ site_title }}{% endblock %}">
+  <meta property="og:type"        content="website">
+  <meta property="og:description" content="{{ site.get('site_tagline', '') }}">
+  {% if site.get('social_telegram_url') %}
+  <meta property="og:url" content="{{ site.get('social_telegram_url') }}">
+  {% endif %}
+
+  <!-- Pixel fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/static/css/crt.css">
+  <link rel="stylesheet" href="/static/css/gallery.css">
+  {% block extra_css %}{% endblock %}
+
+  <style>
+    :root {
+      --bg:       {{ site.get('theme_bg_color',         '#0a0a0a') }};
+      --fg:       {{ site.get('theme_fg_color',         '#33ff33') }};
+      --accent:   {{ site.get('theme_accent_color',     '#ff6600') }};
+      --scanline: {{ site.get('theme_scanline_opacity', '0.05')    }};
+      --font:     '{{ site.get('theme_font', 'VT323') }}', 'Share Tech Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="/" class="site-logo">
+        <span class="logo-bracket">[</span>
+        <span class="logo-text">{{ site_title }}</span>
+        <span class="logo-bracket">]</span>
+      </a>
+      <div class="header-social">
+        {% if site.get('social_telegram_url') %}
+        <a href="{{ site.get('social_telegram_url') }}" target="_blank" rel="noopener" class="social-link" title="Telegram">TG</a>
+        {% endif %}
+        {% if site.get('social_instagram_url') %}
+        <a href="{{ site.get('social_instagram_url') }}" target="_blank" rel="noopener" class="social-link" title="Instagram">IG</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <nav class="site-nav" aria-label="Main navigation">
+      <button class="nav-toggle" aria-label="Toggle menu" onclick="this.nextElementSibling.classList.toggle('is-open')">≡ MENU</button>
+      <ul class="nav-list" id="navList">
+        {% for item in menu %}
+        <li class="nav-item">
+          {% if item.item_type == 'album' and item.album %}
+            <a href="/a/{{ item.album.slug }}" class="nav-link">{{ item.label | upper }}</a>
+          {% elif item.item_type == 'page' and item.page %}
+            <a href="/p/{{ item.page.slug }}" class="nav-link">{{ item.label | upper }}</a>
+          {% elif item.item_type == 'external' and item.ext_url %}
+            <a href="{{ item.ext_url }}" class="nav-link" target="_blank" rel="noopener">{{ item.label | upper }} ↗</a>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </header>
+
+  <main class="site-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span class="footer-copy">© {{ site_title }}</span>
+      <div class="footer-social">
+        {% if site.get('social_telegram_url') %}
+        <a href="{{ site.get('social_telegram_url') }}" target="_blank" rel="noopener" class="social-link">TELEGRAM</a>
+        {% endif %}
+        {% if site.get('social_instagram_url') %}
+        <a href="{{ site.get('social_instagram_url') }}" target="_blank" rel="noopener" class="social-link">INSTAGRAM</a>
+        {% endif %}
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/js/gallery.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

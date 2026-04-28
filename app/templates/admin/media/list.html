@@ -1,0 +1,120 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Media Library{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>// MEDIA LIBRARY</span>
+  <a href="/admin/upload" class="btn btn-primary">&gt; Upload Files</a>
+</div>
+
+<!-- Filter bar -->
+<div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:1.25rem; align-items:center;">
+  <a href="/admin/media"                       class="btn btn-sm {% if not filter_type and not unassigned %}btn-primary{% endif %}">ALL</a>
+  <a href="/admin/media?media_type=photo"       class="btn btn-sm {% if filter_type=='photo'  %}btn-primary{% endif %}">PHOTO</a>
+  <a href="/admin/media?media_type=video"       class="btn btn-sm {% if filter_type=='video'  %}btn-primary{% endif %}">VIDEO</a>
+  <a href="/admin/media?media_type=gif"         class="btn btn-sm {% if filter_type=='gif'    %}btn-primary{% endif %}">GIF</a>
+  <a href="/admin/media?media_type=audio"       class="btn btn-sm {% if filter_type=='audio'  %}btn-primary{% endif %}">AUDIO</a>
+  <a href="/admin/media?unassigned=1"           class="btn btn-sm {% if unassigned=='1'       %}btn-primary{% endif %}">UNASSIGNED</a>
+  <span style="color:#2a2a2a; font-size:0.75rem; margin-left:0.5rem;">{{ media_items | length }} files</span>
+</div>
+
+{% if media_items %}
+<table class="admin-table">
+  <thead>
+    <tr>
+      <th style="width:50px;">Thumb</th>
+      <th>Filename</th>
+      <th>Type</th>
+      <th>Album</th>
+      <th>Size</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in media_items %}
+    <tr id="media-row-{{ item.id }}">
+      <!-- Thumbnail -->
+      <td>
+        {% if item.thumb_path %}
+          <img src="/media/{{ item.thumb_path }}" class="admin-thumb">
+        {% elif item.conversion_status == 'done' %}
+          <div class="admin-thumb" style="display:flex;align-items:center;justify-content:center;color:#1a1a1a;font-size:0.6rem;">
+            {{ item.media_type[:3] | upper }}
+          </div>
+        {% else %}
+          <div class="admin-thumb"
+               hx-get="/admin/api/media/{{ item.id }}/status"
+               hx-trigger="every 3s"
+               hx-swap="none"
+               hx-on::after-request="if(JSON.parse(event.detail.xhr.responseText).conversion_status=='done') location.reload()"
+               style="display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:0.6rem;">
+            …
+          </div>
+        {% endif %}
+      </td>
+
+      <!-- Filename -->
+      <td style="font-size:0.82rem; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+        {{ item.original_filename }}
+      </td>
+
+      <!-- Type -->
+      <td><span class="badge" style="border-color:var(--border2);color:var(--border2);">{{ item.media_type | upper }}</span></td>
+
+      <!-- Album (quick-assign) -->
+      <td style="min-width:140px;">
+        <form hx-post="/admin/api/media/{{ item.id }}/assign"
+              hx-target="#assign-result-{{ item.id }}"
+              hx-swap="innerHTML"
+              style="display:flex; gap:0.3rem; align-items:center;">
+          <select name="album_id" class="form-input" style="font-size:0.72rem; padding:0.2rem 0.4rem;">
+            <option value="">-- none --</option>
+            {% for album in albums %}
+            <option value="{{ album.id }}"
+              {% if item.album_id == album.id %}selected{% endif %}>
+              {{ album.title[:20] }}{% if album.title|length > 20 %}…{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm">✔</button>
+        </form>
+        <span id="assign-result-{{ item.id }}"></span>
+      </td>
+
+      <!-- File size -->
+      <td style="font-size:0.75rem; color:#333; white-space:nowrap;">
+        {% if item.file_size_original %}
+          {{ (item.file_size_original / 1048576) | round(1) }} MB
+        {% else %}—{% endif %}
+      </td>
+
+      <!-- Conversion status -->
+      <td>
+        <span class="badge badge-{{ item.conversion_status }}">{{ item.conversion_status | upper }}</span>
+        {% if item.conversion_error %}
+          <div style="font-size:0.6rem; color:#ff4444; margin-top:0.15rem;">{{ item.conversion_error[:60] }}</div>
+        {% endif %}
+      </td>
+
+      <!-- Actions -->
+      <td>
+        <form action="/admin/api/media/{{ item.id }}/delete" method="post"
+              onsubmit="return confirm('Delete {{ item.original_filename | replace("'", "\\'") }}?')">
+          <button type="submit" class="btn btn-sm btn-danger">×</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% else %}
+<div class="empty-state">
+  <h3>[ NO MEDIA ]</h3>
+  <p>Upload your first files.</p>
+  <a href="/admin/upload" class="btn btn-primary">&gt; Upload Files</a>
+</div>
+{% endif %}
+
+{% endblock %}

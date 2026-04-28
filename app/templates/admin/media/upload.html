@@ -1,0 +1,144 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Upload Media{% endblock %}
+
+{% block extra_css %}
+<style>
+.upload-zone {
+  border: 2px dashed var(--border2);
+  padding: 2.5rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--dim2);
+  position: relative;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(255,102,0,0.04);
+}
+.upload-zone input[type="file"] {
+  position: absolute; inset: 0;
+  opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.upload-zone-icon  { font-size: 2rem; color: var(--border2); margin-bottom: 0.6rem; }
+.upload-zone-label { font-size: 1rem; letter-spacing: 0.1em; color: var(--border2); }
+.upload-zone-hint  { font-size: 0.72rem; color: #2a2a2a; margin-top: 0.3rem; letter-spacing: 0.06em; }
+.upload-zone.has-files .upload-zone-label { color: var(--accent); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>// UPLOAD MEDIA</span>
+  <a href="/admin/media" class="btn btn-sm">← Library</a>
+</div>
+
+<div x-data="uploadZone()" style="max-width:700px;">
+
+  <form
+    hx-post="/admin/api/upload"
+    hx-target="#upload-queue"
+    hx-swap="innerHTML"
+    hx-encoding="multipart/form-data"
+    hx-indicator="#upload-spinner"
+    @submit="isUploading = true"
+    @htmx:after-request="isUploading = false">
+
+    <!-- Album selector -->
+    <div class="form-group">
+      <label class="form-label">Assign to Album (optional)</label>
+      <select name="album_id" class="form-input">
+        <option value="">— Unassigned (goes to library)</option>
+        {% for album in albums %}
+        <option value="{{ album.id }}"
+          {% if preselected_album and preselected_album == album.id %}selected{% endif %}>
+          {% if album.parent_id %}  └ {% endif %}{{ album.title }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Drop zone -->
+    <div class="upload-zone"
+         :class="{ 'drag-over': isDragging, 'has-files': fileCount > 0 }"
+         @dragover.prevent="isDragging = true"
+         @dragleave="isDragging = false"
+         @drop.prevent="onDrop($event)">
+
+      <input type="file" name="files" multiple
+             accept="image/*,video/*,audio/*,.gif"
+             @change="onFileChange($event)">
+
+      <div class="upload-zone-icon">□</div>
+      <div class="upload-zone-label">
+        <span x-show="fileCount === 0">DRAG FILES HERE or CLICK TO SELECT</span>
+        <span x-show="fileCount > 0" x-cloak>
+          <span x-text="fileCount"></span> file(s) selected
+        </span>
+      </div>
+      <div class="upload-zone-hint">JPG │ PNG │ WEBP │ HEIC │ GIF │ MP4 │ MOV │ MP3 │ FLAC │ WAV</div>
+    </div>
+
+    <!-- Selected files list -->
+    <div x-show="fileCount > 0" x-cloak
+         style="margin-top:0.6rem; font-size:0.75rem; color:#333; max-height:120px; overflow-y:auto;">
+      <template x-for="name in fileNames" :key="name">
+        <div style="padding:0.15rem 0;">&rsaquo; <span x-text="name"></span></div>
+      </template>
+    </div>
+
+    <!-- Submit -->
+    <div style="margin-top:1rem; display:flex; align-items:center; gap:0.75rem;">
+      <button type="submit" class="btn btn-primary"
+              :disabled="fileCount === 0 || isUploading"
+              x-text="isUploading ? '[ UPLOADING... ]' : '[ UPLOAD ]'">
+        [ UPLOAD ]
+      </button>
+      <span id="upload-spinner" class="htmx-indicator"
+            style="font-size:0.8rem; color:var(--accent); letter-spacing:0.1em;">
+        transmitting<span class="blink">█</span>
+      </span>
+    </div>
+
+  </form>
+
+  <!-- Conversion queue (populated by HTMX) -->
+  <div style="margin-top:1.5rem;">
+    <div id="queue-header" class="section-title" style="display:none;">
+      <span>// CONVERSION QUEUE</span>
+    </div>
+    <div id="upload-queue"
+         x-init="$watch('$el.children.length', v => { document.getElementById('queue-header').style.display = v > 0 ? 'flex' : 'none'; })"
+         style="margin-top:0.5rem;"></div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function uploadZone() {
+  return {
+    fileCount:   0,
+    fileNames:   [],
+    isDragging:  false,
+    isUploading: false,
+    onFileChange(e) {
+      const files = Array.from(e.target.files);
+      this.fileCount = files.length;
+      this.fileNames = files.map(f => f.name);
+    },
+    onDrop(e) {
+      this.isDragging = false;
+      // Manually assign dropped files to the input
+      const input = this.$el.querySelector('input[type="file"]');
+      const dt = new DataTransfer();
+      Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
+      input.files = dt.files;
+      this.fileCount = dt.files.length;
+      this.fileNames = Array.from(dt.files).map(f => f.name);
+    },
+  };
+}
+</script>
+{% endblock %}

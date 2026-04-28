@@ -1,0 +1,20 @@
+{#
+  HTMX response fragment: rendered after upload POST.
+  Injects polling job cards into #upload-queue.
+#}
+{% for r in results %}
+<div id="job-{{ r.job_id }}" class="job-item"
+  hx-get="/admin/api/jobs/{{ r.job_id }}/fragment"
+  hx-trigger="every 2s"
+  hx-swap="outerHTML">
+
+  <div class="job-header">
+    <span class="job-name">{{ r.filename }}</span>
+    <span class="badge badge-pending">QUEUED</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" style="width:0%;"></div></div>
+
+</div>
+{% else %}
+<div style="font-size:0.8rem; color:#333; padding:0.5rem 0;">No files received.</div>
+{% endfor %}

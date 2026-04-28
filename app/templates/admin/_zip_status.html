@@ -1,0 +1,48 @@
+{# HTMX fragment: ZIP build status. Polls itself until done/error. #}
+{% if job %}
+<div id="zip-status-{{ album_id }}"
+  {% if job.status in ('pending', 'running') %}
+  hx-get="/admin/api/albums/{{ album_id }}/zip-status?job_id={{ job.id }}"
+  hx-trigger="every 3s"
+  hx-swap="outerHTML"
+  {% endif %}
+  style="margin-top:0.75rem;">
+
+  {% if job.status == 'done' and job.result_path %}
+    <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+      <a href="/download/zip/{{ album_id }}"
+         class="btn btn-primary" download>
+        ⬇ Download ZIP
+      </a>
+      <span style="font-size:0.72rem; color:#333;">
+        {{ job.result_path.split('\\')[-1].split('/')[-1] }}
+      </span>
+    </div>
+
+  {% elif job.status == 'error' %}
+    <div style="font-size:0.8rem; color:#ff4444;">! ZIP error: {{ job.error_message or 'unknown' }}</div>
+    <form action="/admin/albums/{{ album_id }}/build-zip" method="post" style="margin-top:0.4rem;">
+      <button class="btn btn-sm">↻ Retry ZIP</button>
+    </form>
+
+  {% else %}
+    <div style="font-size:0.8rem; color:#333; letter-spacing:0.06em;">
+      <span class="blink" style="color:var(--accent);">&#9632;</span>
+      BUILDING ZIP… {{ job.done_items }}/{{ job.total_items }}
+    </div>
+    <div class="progress-bar" style="margin-top:0.3rem;">
+      <div class="progress-fill" style="width:{{ job.progress }}%;"></div>
+    </div>
+  {% endif %}
+
+</div>
+{% else %}
+<div id="zip-status-{{ album_id }}" style="margin-top:0.75rem;">
+  <form action="/admin/albums/{{ album_id }}/build-zip" method="post"
+        hx-post="/admin/albums/{{ album_id }}/build-zip"
+        hx-target="#zip-status-{{ album_id }}"
+        hx-swap="outerHTML">
+    <button class="btn btn-sm">□ Build ZIP of Originals</button>
+  </form>
+</div>
+{% endif %}

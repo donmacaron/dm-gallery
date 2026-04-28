@@ -1,0 +1,42 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Import Folder{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>// FOLDER IMPORT</span>
+  <a href="/admin/media" class="btn btn-sm">← Library</a>
+</div>
+
+<div style="max-width:680px;">
+
+  {% if error %}
+  <div class="login-error" style="margin-bottom:1rem;">! {{ error }}</div>
+  {% endif %}
+
+  <p style="font-size:0.85rem; color:#333; margin-bottom:1.25rem; letter-spacing:0.04em;">
+    Paste a local folder path. All supported media files will be copied to originals storage
+    and queued for conversion. A new private album will be created automatically.
+  </p>
+
+  <!-- Step 1: Scan -->
+  <div class="section-title"><span>// STEP 1 — SCAN FOLDER</span></div>
+  <div style="margin-top:0.75rem; display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap;">
+    <div class="form-group" style="flex:1; min-width:300px; margin-bottom:0;">
+      <label class="form-label" for="scan_path">Folder Path</label>
+      <input class="form-input" type="text" id="scan_path" placeholder="C:\Users\...\photos"
+             value="{{ request.query_params.get('path', '') }}">
+    </div>
+    <button class="btn btn-primary"
+            hx-post="/admin/folder-import/scan"
+            hx-target="#scan-result"
+            hx-swap="innerHTML"
+            hx-include="#scan_path"
+            hx-vals='js:{"folder_path": document.getElementById("scan_path").value}'>
+      &gt; Scan
+    </button>
+  </div>
+
+  <div id="scan-result" style="margin-top:1rem;"></div>
+
+</div>
+{% endblock %}

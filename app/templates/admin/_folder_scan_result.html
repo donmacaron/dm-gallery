@@ -1,0 +1,42 @@
+{# HTMX fragment: result of scanning a folder #}
+{% if error %}
+<div class="login-error">! {{ error }}</div>
+{% elif result %}
+<div class="card" style="padding:1rem;">
+  <div class="section-title" style="margin-bottom:0.75rem;">
+    <span>// SCAN RESULT</span>
+    <span style="color:var(--accent);">{{ result.total }} files found</span>
+  </div>
+
+  <div style="display:flex; gap:1.5rem; flex-wrap:wrap; font-size:0.8rem; color:#333; margin-bottom:1rem;">
+    {% if result.photos    %}<span>PHOTOS: {{ result.photos | length }}</span>{% endif %}
+    {% if result.gifs      %}<span>GIFs: {{ result.gifs | length }}</span>{% endif %}
+    {% if result.videos    %}<span>VIDEOS: {{ result.videos | length }}</span>{% endif %}
+    {% if result.audio     %}<span>AUDIO: {{ result.audio | length }}</span>{% endif %}
+    {% if result.other     %}<span style="color:#2a2a2a;">UNSUPPORTED: {{ result.other | length }}</span>{% endif %}
+  </div>
+
+  {% if result.total > 0 %}
+  <form action="/admin/folder-import/import" method="post">
+    <input type="hidden" name="folder_path" value="{{ folder_path }}">
+
+    <div class="form-group">
+      <label class="form-label">Album Title</label>
+      <input class="form-input" type="text" name="album_title"
+             value="{{ folder_path.split('\\')[-1].split('/')[-1] }}"
+             placeholder="Album name" required>
+    </div>
+
+    <div style="display:flex; gap:0.75rem; margin-top:0.5rem;">
+      <button type="submit" class="btn btn-primary">&gt; IMPORT {{ result.total }} FILES</button>
+      <a href="/admin/folder-import" class="btn">Cancel</a>
+    </div>
+    <div style="font-size:0.65rem; color:#2a2a2a; margin-top:0.4rem;">
+      Files will be copied to originals storage. A private album will be created.
+    </div>
+  </form>
+  {% else %}
+  <div style="color:#333; font-size:0.85rem;">No supported media files found in this folder.</div>
+  {% endif %}
+</div>
+{% endif %}

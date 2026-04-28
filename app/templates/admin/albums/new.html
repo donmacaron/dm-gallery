@@ -1,0 +1,50 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}New Album{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>// NEW ALBUM</span>
+  <a href="/admin/albums" class="btn btn-sm">← Back</a>
+</div>
+
+<form action="/admin/albums/create" method="post" style="max-width:560px;">
+
+  <div class="form-group">
+    <label class="form-label" for="title">Title *</label>
+    <input class="form-input" type="text" id="title" name="title"
+           placeholder="My Portfolio" required autofocus>
+    <div style="font-size:0.65rem; color:#2a2a2a; margin-top:0.25rem;">URL slug auto-generated from title</div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label" for="description">Description</label>
+    <textarea class="form-input" id="description" name="description"
+              rows="3" placeholder="Optional short description"></textarea>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label" for="parent_id">Parent Album (for nesting)</label>
+    <select class="form-input" id="parent_id" name="parent_id">
+      <option value="">— Top-level album</option>
+      {% for a in all_albums %}
+      <option value="{{ a.id }}">{{ a.title }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group" style="display:flex; gap:2rem; flex-wrap:wrap;">
+    <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+      <input type="checkbox" name="is_public" value="on"> Public (visible to all)
+    </label>
+    <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+      <input type="checkbox" name="auto_zip" value="on"> Auto-build ZIP on upload
+    </label>
+  </div>
+
+  <div style="display:flex; gap:0.75rem; margin-top:1rem;">
+    <button type="submit" class="btn btn-primary">&gt; CREATE ALBUM</button>
+    <a href="/admin/albums" class="btn">Cancel</a>
+  </div>
+
+</form>
+{% endblock %}

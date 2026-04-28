@@ -1,0 +1,60 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Cleanup{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>// FILE CLEANUP</span>
+</div>
+
+{% if done %}
+<div style="background:rgba(51,255,51,0.06);border:1px solid var(--fg);color:var(--fg);padding:0.5rem 0.75rem;margin-bottom:1rem;font-size:0.85rem;">
+  ✓ Deleted {{ deleted }} file(s).
+</div>
+{% endif %}
+
+<p style="font-size:0.82rem; color:#333; margin-bottom:1.5rem; letter-spacing:0.04em;">
+  Orphaned files are on-disk files with no corresponding database record.
+  They are safe to delete. This does NOT affect any media visible in the gallery.
+</p>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; max-width:700px; margin-bottom:1.5rem;">
+
+  <div class="stat-card">
+    <div class="stat-card-label">Orphan Originals</div>
+    <div class="stat-card-value {% if stats.total_originals > 0 %}warn{% endif %}">{{ stats.total_originals }}</div>
+    <div style="font-size:0.7rem; color:#333; margin-top:0.2rem;">{{ stats.size_originals_mb }} MB</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-card-label">Orphan Media Files</div>
+    <div class="stat-card-value {% if stats.total_media > 0 %}warn{% endif %}">{{ stats.total_media }}</div>
+    <div style="font-size:0.7rem; color:#333; margin-top:0.2rem;">{{ stats.size_media_mb }} MB</div>
+  </div>
+
+</div>
+
+{% if stats.total_originals > 0 or stats.total_media > 0 %}
+<div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+  <form action="/admin/cleanup/run" method="post"
+        onsubmit="return confirm('Delete all orphaned media files? This cannot be undone.')">
+    <input type="hidden" name="what" value="media">
+    <button type="submit" class="btn btn-danger">&times; Delete Orphan Media ({{ stats.total_media }})</button>
+  </form>
+  <form action="/admin/cleanup/run" method="post"
+        onsubmit="return confirm('Delete all orphaned ORIGINAL files? This cannot be undone.')">
+    <input type="hidden" name="what" value="originals">
+    <button type="submit" class="btn btn-danger">&times; Delete Orphan Originals ({{ stats.total_originals }})</button>
+  </form>
+  <form action="/admin/cleanup/run" method="post"
+        onsubmit="return confirm('Delete ALL orphaned files (originals + media)? Cannot be undone.')">
+    <input type="hidden" name="what" value="all">
+    <button type="submit" class="btn btn-danger">&times; Delete All Orphans</button>
+  </form>
+</div>
+{% else %}
+<div style="color:var(--fg); font-size:0.85rem; padding:1.5rem 0;">
+  [ ✓ NO ORPHANED FILES FOUND ]
+</div>
+{% endif %}
+
+{% endblock %}

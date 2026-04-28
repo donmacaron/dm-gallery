@@ -1,0 +1,80 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Menu Manager{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>// MENU MANAGER</span>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; max-width:900px;">
+
+  <!-- LEFT: current items -->
+  <div>
+    <div class="section-title"><span>// CURRENT ITEMS</span></div>
+    <div id="menu-items-list" style="margin-top:0.75rem;">
+      {% include "admin/menu/_items_list.html" %}
+    </div>
+  </div>
+
+  <!-- RIGHT: add new item -->
+  <div>
+    <div class="section-title"><span>// ADD ITEM</span></div>
+    <form action="/admin/menu/create" method="post" style="margin-top:0.75rem;">
+
+      <div class="form-group">
+        <label class="form-label">Label</label>
+        <input class="form-input" type="text" name="label" placeholder="About" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <select class="form-input" name="item_type" id="type-select"
+                onchange="updateTypeFields()">
+          <option value="external">External URL</option>
+          <option value="page">Page</option>
+          <option value="album">Album</option>
+        </select>
+      </div>
+
+      <div id="field-external" class="form-group">
+        <label class="form-label">URL</label>
+        <input class="form-input" type="text" name="ext_url" placeholder="https://...">
+      </div>
+
+      <div id="field-page" class="form-group" style="display:none;">
+        <label class="form-label">Page</label>
+        <select class="form-input" name="page_id">
+          <option value="">-- select --</option>
+          {% for p in pages %}
+          <option value="{{ p.id }}">{{ p.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="field-album" class="form-group" style="display:none;">
+        <label class="form-label">Album</label>
+        <select class="form-input" name="album_id">
+          <option value="">-- select --</option>
+          {% for a in albums %}
+          <option value="{{ a.id }}">{{ a.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;">&gt; Add Item</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateTypeFields() {
+  const type = document.getElementById('type-select').value;
+  document.getElementById('field-external').style.display = type === 'external' ? '' : 'none';
+  document.getElementById('field-page').style.display     = type === 'page'     ? '' : 'none';
+  document.getElementById('field-album').style.display    = type === 'album'    ? '' : 'none';
+}
+</script>
+{% endblock %}

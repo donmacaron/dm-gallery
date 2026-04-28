@@ -1,0 +1,49 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Pages{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>// PAGES</span>
+  <a href="/admin/pages/new" class="btn btn-primary">&gt; New Page</a>
+</div>
+
+{% if pages %}
+<table class="admin-table">
+  <thead>
+    <tr><th>Title</th><th>Slug</th><th>Status</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {% for page in pages %}
+    <tr>
+      <td><a href="/admin/pages/{{ page.id }}" style="color:var(--fg);">{{ page.title }}</a></td>
+      <td style="font-size:0.75rem; color:#333;">/p/{{ page.slug }}</td>
+      <td>
+        <span class="badge {% if page.is_published %}badge-public{% else %}badge-private{% endif %}"
+              id="pub-{{ page.id }}"
+              hx-post="/admin/pages/{{ page.id }}/toggle-publish"
+              hx-trigger="click" hx-swap="outerHTML" style="cursor:pointer;">
+          {% if page.is_published %}PUBLISHED{% else %}DRAFT{% endif %}
+        </span>
+      </td>
+      <td style="white-space:nowrap;">
+        <a href="/admin/pages/{{ page.id }}" class="btn btn-sm">Edit</a>
+        {% if page.is_published %}
+        <a href="/p/{{ page.slug }}" target="_blank" class="btn btn-sm">View ↗</a>
+        {% endif %}
+        <form action="/admin/pages/{{ page.id }}/delete" method="post" style="display:inline;"
+              onsubmit="return confirm('Delete page \'{{ page.title }}\'?')">
+          <button type="submit" class="btn btn-sm btn-danger">×</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty-state">
+  <h3>[ NO PAGES ]</h3>
+  <p>Pages are rich-text articles that appear in the menu.</p>
+  <a href="/admin/pages/new" class="btn btn-primary">&gt; Create First Page</a>
+</div>
+{% endif %}
+{% endblock %}

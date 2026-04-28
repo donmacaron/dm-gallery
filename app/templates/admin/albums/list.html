@@ -1,0 +1,79 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Albums{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>// ALBUMS</span>
+  <a href="/admin/albums/new" class="btn btn-primary">&gt; New Album</a>
+</div>
+
+{% if albums %}
+<table class="admin-table">
+  <thead>
+    <tr>
+      <th>Cover</th>
+      <th>Title</th>
+      <th>Visibility</th>
+      <th>Files</th>
+      <th>ZIP</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for album in albums %}
+    <tr>
+      <td>
+        {% if album.cover_thumb_path %}
+          <img src="/media/{{ album.cover_thumb_path }}" class="admin-thumb">
+        {% else %}
+          <div class="admin-thumb" style="display:flex;align-items:center;justify-content:center;color:#1a1a1a;font-size:0.55rem;">□</div>
+        {% endif %}
+      </td>
+
+      <td>
+        {% if album.parent_id %}
+          <span style="color:#2a2a2a;">  └ </span>
+        {% endif %}
+        <a href="/admin/albums/{{ album.id }}" style="color:var(--fg);">{{ album.title }}</a>
+        <div style="font-size:0.65rem; color:#2a2a2a; margin-top:0.15rem;">/{{ album.slug }}</div>
+      </td>
+
+      <td>
+        <span class="badge {% if album.is_public %}badge-public{% else %}badge-private{% endif %}"
+              id="visibility-{{ album.id }}"
+              hx-post="/admin/albums/{{ album.id }}/toggle-public"
+              hx-trigger="click"
+              hx-swap="outerHTML"
+              style="cursor:pointer;" title="Click to toggle">
+          {% if album.is_public %}PUBLIC{% else %}PRIVATE{% endif %}
+        </span>
+      </td>
+
+      <td style="color:#333;">{{ album.media_items | length }}</td>
+
+      <td style="font-size:0.72rem; color:#2a2a2a;">
+        {% if album.auto_zip %}✓{% else %}—{% endif %}
+      </td>
+
+      <td style="white-space:nowrap;">
+        <a href="/admin/albums/{{ album.id }}" class="btn btn-sm">Edit</a>
+        {% if album.is_public %}
+          <a href="/a/{{ album.slug }}" target="_blank" class="btn btn-sm">View ↗</a>
+        {% elif album.share_token %}
+          <a href="/s/{{ album.share_token }}" target="_blank" class="btn btn-sm">Share ↗</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% else %}
+<div class="empty-state">
+  <h3>[ NO ALBUMS ]</h3>
+  <p>Create your first album to start organising your work.</p>
+  <a href="/admin/albums/new" class="btn btn-primary">&gt; New Album</a>
+</div>
+{% endif %}
+
+{% endblock %}

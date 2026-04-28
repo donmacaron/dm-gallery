@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin{% endblock %} — {{ site_title }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/crt.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+  <div class="admin-layout">
+
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <a href="/admin/dashboard" class="admin-sidebar-logo">
+        [ADMIN PANEL]
+        <small>{{ site_title }}</small>
+      </a>
+
+      <nav class="admin-nav">
+
+        <div class="admin-nav-section">
+          <div class="admin-nav-label">Overview</div>
+          <a href="/admin/dashboard" class="admin-nav-link {% if active == 'dashboard' %}active{% endif %}">■ Dashboard</a>
+        </div>
+
+        <div class="admin-nav-section">
+          <div class="admin-nav-label">Media</div>
+          <a href="/admin/albums"        class="admin-nav-link {% if active == 'albums'  %}active{% endif %}">■ Albums</a>
+          <a href="/admin/media"         class="admin-nav-link {% if active == 'media'   %}active{% endif %}">■ Media Library</a>
+          <a href="/admin/upload"        class="admin-nav-link {% if active == 'upload'  %}active{% endif %}">■ Upload Files</a>
+          <a href="/admin/folder-import" class="admin-nav-link {% if active == 'folder'  %}active{% endif %}">■ Import Folder</a>
+        </div>
+
+        <div class="admin-nav-section">
+          <div class="admin-nav-label">Content</div>
+          <a href="/admin/pages"   class="admin-nav-link {% if active == 'pages'    %}active{% endif %}">■ Pages</a>
+          <a href="/admin/menu"    class="admin-nav-link {% if active == 'menu'     %}active{% endif %}">■ Menu</a>
+          <a href="/admin/settings" class="admin-nav-link {% if active == 'settings' %}active{% endif %}">■ Settings</a>
+        </div>
+
+        <div class="admin-nav-section">
+          <div class="admin-nav-label">Tools</div>
+          <a href="/admin/cleanup" class="admin-nav-link {% if active == 'cleanup' %}active{% endif %}">■ File Cleanup</a>
+          <a href="/" target="_blank" class="admin-nav-link">■ Public Site ↗</a>
+        </div>
+
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <div style="font-size:0.7rem; color:#2a2a2a; margin-bottom:0.2rem;">{{ admin }}</div>
+        <a href="/admin/logout" class="admin-logout">[ logout ]</a>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="admin-content">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+
+  <!-- HTMX + Alpine from CDN -->
+  <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  {% block extra_js %}{% endblock %}
+
+</body>
+</html>

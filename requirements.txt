@@ -1,0 +1,35 @@
+# ═══════════════════════════════════════════
+#  Don Macaron Gallery — Python Dependencies
+# ═══════════════════════════════════════════
+
+# Web Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# Database
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+
+# Config
+pydantic-settings>=2.0.0
+
+# File uploads
+python-multipart>=0.0.9
+aiofiles>=23.2.0
+
+# Image processing
+pillow>=10.0.0
+
+# Video processing (ffmpeg wrapper)
+ffmpeg-python>=0.2.0
+
+# Auth
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Templating
+jinja2>=3.1.0
+itsdangerous>=2.1.0
+
+# URL slugs
+python-slugify>=8.0.0

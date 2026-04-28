@@ -1,0 +1,91 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>// DASHBOARD</span>
+  <small>{{ site_title }}</small>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-card-label">Albums</div>
+    <div class="stat-card-value">{{ total_albums }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-label">Media Files</div>
+    <div class="stat-card-value">{{ total_media }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-label">Processing</div>
+    <div class="stat-card-value {% if processing > 0 %}warn{% endif %}">{{ processing }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-label">Queued</div>
+    <div class="stat-card-value {% if pending > 0 %}warn{% endif %}">{{ pending }}</div>
+  </div>
+  {% if error_count > 0 %}
+  <div class="stat-card">
+    <div class="stat-card-label">Errors</div>
+    <div class="stat-card-value err">{{ error_count }}</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Active Jobs (live HTMX polling) -->
+<div id="active-jobs-section" style="margin-bottom:2rem;"
+     {% if active_jobs %}
+     hx-get="/admin/api/jobs/active"
+     hx-trigger="every 4s"
+     hx-target="#active-jobs-list"
+     hx-swap="innerHTML"
+     {% endif %}>
+  {% if active_jobs %}
+  <div class="section-title"><span>// ACTIVE JOBS</span> <span class="blink" style="color:var(--accent);">&#9632;</span></div>
+  <div id="active-jobs-list" style="margin-top:0.5rem;">
+    {% include "admin/_active_jobs.html" %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Quick Actions -->
+<div style="margin-bottom:2rem;">
+  <div class="section-title"><span>// QUICK ACTIONS</span></div>
+  <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-top:0.75rem;">
+    <a href="/admin/upload"   class="btn btn-primary">&gt; Upload Media</a>
+    <a href="/admin/albums/new" class="btn btn-primary">&gt; New Album</a>
+    <a href="/admin/media"    class="btn">&gt; Media Library</a>
+    <a href="/admin/albums"   class="btn">&gt; Albums</a>
+    <a href="/admin/settings" class="btn">&gt; Settings</a>
+  </div>
+</div>
+
+<!-- Recent Uploads -->
+{% if recent_media %}
+<div>
+  <div class="section-title">
+    <span>// RECENT UPLOADS</span>
+    <a href="/admin/media" class="btn btn-sm">View All</a>
+  </div>
+  <div class="recent-grid">
+    {% for item in recent_media %}
+    <a href="/admin/media" class="recent-thumb" title="{{ item.original_filename }}">
+      {% if item.thumb_path %}
+        <img src="/media/{{ item.thumb_path }}" alt="{{ item.original_filename }}" loading="lazy">
+      {% else %}
+        <div class="no-img">{{ item.media_type[:3] | upper }}</div>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <h3>[ NO MEDIA YET ]</h3>
+  <p>Upload your first photos to get started.</p>
+  <a href="/admin/upload" class="btn btn-primary">&gt; Upload Files</a>
+</div>
+{% endif %}
+
+{% endblock %}
