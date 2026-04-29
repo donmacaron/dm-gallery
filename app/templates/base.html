@@ -9,22 +9,27 @@
   <meta property="og:type"        content="website">
   <meta property="og:description" content="{{ site.get('site_tagline', '') }}">
 
-  <!-- Pixel fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-
   <link rel="stylesheet" href="/static/css/crt.css">
   <link rel="stylesheet" href="/static/css/gallery.css">
   {% block extra_css %}{% endblock %}
 
   <style>
     :root {
-      --bg:       {{ site.get('theme_bg_color',         '#0a0a0a') }};
-      --fg:       {{ site.get('theme_fg_color',         '#33ff33') }};
-      --accent:   {{ site.get('theme_accent_color',     '#ff6600') }};
-      --scanline: {{ site.get('theme_scanline_opacity', '0.05')    }};
-      --font:     '{{ site.get('theme_font', 'VT323') }}', 'Share Tech Mono', monospace;
+      --bg:          {{ site.get('theme_bg_color',         '#0a0a0a') }};
+      --fg:          {{ site.get('theme_fg_color',         '#33ff33') }};
+      --accent:      {{ site.get('theme_accent_color',     '#ff6600') }};
+      --scanline:    {{ site.get('theme_scanline_opacity', '0.05')    }};
+      --font:        '{{ site.get('theme_font', 'VT323') }}', 'Share Tech Mono', monospace;
+      /* Header overrides — fall back to page defaults if empty */
+      {%- set h_bg  = site.get('header_bg_color',     '') | trim %}
+      {%- set h_bd  = site.get('header_border_color', '') | trim %}
+      {%- set h_fg  = site.get('header_text_color',   '') | trim %}
+      --header-bg:  {{ h_bg  if h_bg  else 'var(--dim)' }};
+      --header-bd:  {{ h_bd  if h_bd  else 'var(--border)' }};
+      --header-fg:  {{ h_fg  if h_fg  else 'var(--fg)' }};
     }
   </style>
 </head>
@@ -32,7 +37,6 @@
 
   <header class="site-header">
     <div class="header-inner">
-
       <!-- Logo -->
       <a href="/" class="site-logo">
         <span class="logo-bracket">[</span>
@@ -43,37 +47,43 @@
         <span class="logo-bracket">]</span>
       </a>
 
-      <!-- Social icons (header) -->
+      <!-- Social icons -->
       <div class="header-social">
         {% if site.get('social_telegram_url') %}
-          <a href="{{ site.get('social_telegram_url') }}" target="_blank" rel="noopener"
-             class="social-link" title="Telegram">TG</a>
+        <a href="{{ site.get('social_telegram_url') }}" target="_blank" rel="noopener"
+           class="social-icon-link" title="Telegram" aria-label="Telegram">
+          <!-- Telegram SVG -->
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"
+               fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.198 2.433a2.242 2.242 0 0 0-1.022.215l-16.5 6.75a2.25 2.25 0 0 0 .126 4.238l3.553 1.184 1.184 3.553a2.25 2.25 0 0 0 3.935.544l1.65-2.062 3.947 2.897a2.25 2.25 0 0 0 3.467-1.428l2.25-13.5a2.25 2.25 0 0 0-2.59-2.39z"/>
+          </svg>
+        </a>
         {% endif %}
         {% if site.get('social_instagram_url') %}
-          <a href="{{ site.get('social_instagram_url') }}" target="_blank" rel="noopener"
-             class="social-link" title="Instagram">IG</a>
+        <a href="{{ site.get('social_instagram_url') }}" target="_blank" rel="noopener"
+           class="social-icon-link" title="Instagram" aria-label="Instagram">
+          <!-- Instagram SVG -->
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"
+               fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+            <circle cx="12" cy="12" r="4.5"/>
+            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+        </a>
         {% endif %}
       </div>
     </div>
 
-    <!-- Optional tagline under header -->
+    <!-- Optional tagline row -->
     {% if site.get('header_show_tagline') == '1' and site.get('site_tagline') %}
-    <div style="text-align:center; font-size:0.72rem; color:#333; letter-spacing:0.15em;
-                padding:0.2rem 1.5rem 0.35rem; border-top:1px solid var(--border);">
-      {{ site.get('site_tagline') }}
-    </div>
+    <div class="header-tagline">{{ site.get('site_tagline') }}</div>
     {% endif %}
 
     <!-- Navigation -->
     <nav class="site-nav" aria-label="Main navigation">
-      <!--
-        NOTE: NO inline onclick here.
-        The click handler is in gallery.js -> initNavToggle()
-        Having both causes double-toggle (open then immediately close).
-      -->
-      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
-        ≡ MENU
-      </button>
+      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">≡ MENU</button>
       <ul class="nav-list" id="navList">
         {% for item in menu %}
         <li class="nav-item">
@@ -87,19 +97,17 @@
     </nav>
   </header>
 
-  <main class="site-main">
-    {% block content %}{% endblock %}
-  </main>
+  <main class="site-main">{% block content %}{% endblock %}</main>
 
   <footer class="site-footer">
     <div class="footer-inner">
       <span class="footer-copy">© {{ site_title }}</span>
       <div class="footer-social">
         {% if site.get('social_telegram_url') %}
-          <a href="{{ site.get('social_telegram_url') }}" target="_blank" rel="noopener" class="social-link">TELEGRAM</a>
+        <a href="{{ site.get('social_telegram_url') }}" target="_blank" rel="noopener" class="social-link">TELEGRAM</a>
         {% endif %}
         {% if site.get('social_instagram_url') %}
-          <a href="{{ site.get('social_instagram_url') }}" target="_blank" rel="noopener" class="social-link">INSTAGRAM</a>
+        <a href="{{ site.get('social_instagram_url') }}" target="_blank" rel="noopener" class="social-link">INSTAGRAM</a>
         {% endif %}
       </div>
     </div>

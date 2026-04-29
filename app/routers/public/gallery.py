@@ -21,8 +21,11 @@ def get_site_ctx(db: Session) -> dict:
     ctx  = {s.key: s.value for s in rows}
     ctx.setdefault("site_title",             settings_obj.site_title)
     ctx.setdefault("site_tagline",           settings_obj.site_tagline)
-    ctx.setdefault("header_logo_text",       "")   # blank = use site_title
+    ctx.setdefault("header_logo_text",       "")
     ctx.setdefault("header_show_tagline",    "0")
+    ctx.setdefault("header_bg_color",        "")
+    ctx.setdefault("header_border_color",    "")
+    ctx.setdefault("header_text_color",      "")
     ctx.setdefault("theme_bg_color",         "#0a0a0a")
     ctx.setdefault("theme_fg_color",         "#33ff33")
     ctx.setdefault("theme_accent_color",     "#ff6600")
@@ -34,10 +37,6 @@ def get_site_ctx(db: Session) -> dict:
 
 
 def get_menu(db: Session) -> list:
-    """
-    Return menu items as plain dicts with pre-computed URLs.
-    Avoids lazy-loading SQLAlchemy relationships inside Jinja2 templates.
-    """
     items = (
         db.query(MenuItem)
         .filter(MenuItem.is_visible == True, MenuItem.parent_id == None)
@@ -67,7 +66,6 @@ def get_menu(db: Session) -> list:
 async def home(request: Request, db: Session = Depends(get_db)):
     site = get_site_ctx(db)
     menu = get_menu(db)
-
     featured_id = site.get("homepage_album_id", "")
     if featured_id and str(featured_id).isdigit():
         featured = db.query(Album).filter(
@@ -75,15 +73,13 @@ async def home(request: Request, db: Session = Depends(get_db)):
         ).first()
         if featured:
             media_items = db.query(Media).filter(
-                Media.album_id == featured.id,
-                Media.conversion_status == "done",
+                Media.album_id == featured.id, Media.conversion_status == "done",
             ).order_by(Media.sort_order, Media.created_at).all()
             return templates.TemplateResponse(request, "public/home.html", {
                 "site": site, "site_title": site["site_title"],
                 "menu": menu, "albums": [],
                 "featured_album": featured, "media_items": media_items,
             })
-
     albums = (
         db.query(Album)
         .filter(Album.is_public == True, Album.parent_id == None)
@@ -92,8 +88,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
     )
     return templates.TemplateResponse(request, "public/home.html", {
         "site": site, "site_title": site["site_title"],
-        "menu": menu, "albums": albums,
-        "featured_album": None, "media_items": [],
+        "menu": menu, "albums": albums, "featured_album": None, "media_items": [],
     })
 
 
@@ -101,36 +96,30 @@ async def home(request: Request, db: Session = Depends(get_db)):
 async def album_view(slug: str, request: Request, db: Session = Depends(get_db)):
     site = get_site_ctx(db)
     menu = get_menu(db)
-
     album = db.query(Album).filter(Album.slug == slug, Album.is_public == True).first()
     if not album:
         return templates.TemplateResponse(request, "public/404.html", {
             "site": site, "site_title": site["site_title"], "menu": menu,
         }, status_code=404)
-
     media_items = (
         db.query(Media)
         .filter(Media.album_id == album.id, Media.conversion_status == "done")
-        .order_by(Media.sort_order, Media.created_at)
-        .all()
+        .order_by(Media.sort_order, Media.created_at).all()
     )
     sub_albums = (
         db.query(Album)
         .filter(Album.parent_id == album.id, Album.is_public == True)
-        .order_by(Album.sort_order)
-        .all()
+        .order_by(Album.sort_order).all()
     )
     breadcrumb = []
     if album.parent_id:
         parent = db.query(Album).filter(Album.id == album.parent_id).first()
         if parent:
             breadcrumb.append({"title": parent.title, "slug": parent.slug})
-
     return templates.TemplateResponse(request, "public/album.html", {
         "site": site, "site_title": site["site_title"],
         "menu": menu, "album": album,
-        "media_items": media_items, "sub_albums": sub_albums,
-        "breadcrumb": breadcrumb,
+        "media_items": media_items, "sub_albums": sub_albums, "breadcrumb": breadcrumb,
     })
 
 
@@ -138,18 +127,15 @@ async def album_view(slug: str, request: Request, db: Session = Depends(get_db))
 async def shared_album(token: str, request: Request, db: Session = Depends(get_db)):
     site = get_site_ctx(db)
     menu = get_menu(db)
-
     album = db.query(Album).filter(Album.share_token == token).first()
     if not album:
         return templates.TemplateResponse(request, "public/404.html", {
             "site": site, "site_title": site["site_title"], "menu": menu,
         }, status_code=404)
-
     media_items = (
         db.query(Media)
         .filter(Media.album_id == album.id, Media.conversion_status == "done")
-        .order_by(Media.sort_order, Media.created_at)
-        .all()
+        .order_by(Media.sort_order, Media.created_at).all()
     )
     return templates.TemplateResponse(request, "public/album.html", {
         "site": site, "site_title": site["site_title"],

@@ -2,9 +2,7 @@
 {% block title %}Settings{% endblock %}
 
 {% block content %}
-<div class="admin-page-title">
-  <span>// SETTINGS</span>
-</div>
+<div class="admin-page-title"><span>// SETTINGS</span></div>
 
 {% if saved %}
 <div style="background:rgba(51,255,51,0.06);border:1px solid var(--fg);color:var(--fg);padding:0.5rem 0.75rem;margin-bottom:1.25rem;font-size:0.85rem;letter-spacing:0.06em;">
@@ -13,7 +11,6 @@
 {% endif %}
 
 <form action="/admin/settings/update" method="post" style="max-width:640px;">
-
   {% for group_name, fields in groups %}
   <div style="margin-bottom:1.75rem;">
     <div class="section-title" style="margin-bottom:0.85rem;"><span>// {{ group_name | upper }}</span></div>
@@ -23,15 +20,26 @@
       <label class="form-label" for="{{ key }}">{{ label }}</label>
 
       {% if ftype == 'color' %}
+        {# Color: show picker + hex text input side-by-side.
+           Hidden input with name= is what the form submits. #}
+        {% set cur = current.get(key, '') %}
         <div style="display:flex;gap:0.5rem;align-items:center;">
           <input type="color" id="{{ key }}_picker"
-                 value="{{ current.get(key, '#000000') }}"
-                 style="width:44px;height:36px;border:1px solid var(--border);background:none;cursor:pointer;padding:2px;"
-                 oninput="document.getElementById('{{ key }}').value=this.value">
-          <input class="form-input" type="text" id="{{ key }}" name="{{ key }}"
-                 value="{{ current.get(key, '') }}"
-                 style="width:120px;"
-                 oninput="document.getElementById('{{ key }}_picker').value=this.value">
+                 value="{{ cur if cur else '#000000' }}"
+                 style="width:44px;height:36px;border:1px solid var(--border);background:none;cursor:pointer;padding:2px;flex-shrink:0;"
+                 oninput="syncColor('{{ key }}', this.value)">
+          <input class="form-input" type="text" id="{{ key }}_text"
+                 value="{{ cur }}"
+                 placeholder="#rrggbb or empty"
+                 style="width:140px;"
+                 oninput="syncColor('{{ key }}', this.value)">
+          <input type="hidden" name="{{ key }}" id="{{ key }}" value="{{ cur }}">
+          <button type="button" class="btn btn-sm"
+                  onclick="clearColor('{{ key }}')"
+                  title="Clear (inherit from theme)">× clear</button>
+        </div>
+        <div style="font-size:0.62rem;color:#333;margin-top:0.25rem;letter-spacing:0.06em;">
+          Leave empty to inherit the page background / text color
         </div>
 
       {% elif ftype == 'checkbox' %}
@@ -47,13 +55,32 @@
                {% if ftype == 'url' %}placeholder="https://"{% endif %}
                {% if key == 'header_logo_text' %}placeholder="Leave empty to use Site Title"{% endif %}>
       {% endif %}
-
     </div>
     {% endfor %}
   </div>
   {% endfor %}
 
-  <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;">&gt; Save All Settings</button>
-
+  <button type="submit" class="btn btn-primary">&gt; Save All Settings</button>
 </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function syncColor(key, val) {
+  const hidden = document.getElementById(key);
+  const picker = document.getElementById(key + '_picker');
+  const text   = document.getElementById(key + '_text');
+  if (hidden) hidden.value = val;
+  // Only update picker if looks like a valid hex
+  if (picker && /^#[0-9a-fA-F]{6}$/.test(val)) picker.value = val;
+  if (text && document.activeElement !== text) text.value = val;
+}
+function clearColor(key) {
+  document.getElementById(key).value          = '';
+  document.getElementById(key + '_text').value = '';
+  // Reset picker to black (visual only)
+  const p = document.getElementById(key + '_picker');
+  if (p) p.value = '#000000';
+}
+</script>
 {% endblock %}
