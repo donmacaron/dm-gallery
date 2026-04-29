@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.album import Album
 from app.models.media import Media
 from app.models.menu import MenuItem
+from app.models.page import Page
 from app.models.setting import Setting
 
 router = APIRouter(tags=["public"])
@@ -17,9 +18,11 @@ settings_obj = get_settings()
 
 def get_site_ctx(db: Session) -> dict:
     rows = db.query(Setting).all()
-    ctx = {s.key: s.value for s in rows}
+    ctx  = {s.key: s.value for s in rows}
     ctx.setdefault("site_title",             settings_obj.site_title)
     ctx.setdefault("site_tagline",           settings_obj.site_tagline)
+    ctx.setdefault("header_logo_text",       "")   # blank = use site_title
+    ctx.setdefault("header_show_tagline",    "0")
     ctx.setdefault("theme_bg_color",         "#0a0a0a")
     ctx.setdefault("theme_fg_color",         "#33ff33")
     ctx.setdefault("theme_accent_color",     "#ff6600")
@@ -31,12 +34,33 @@ def get_site_ctx(db: Session) -> dict:
 
 
 def get_menu(db: Session) -> list:
-    return (
+    """
+    Return menu items as plain dicts with pre-computed URLs.
+    Avoids lazy-loading SQLAlchemy relationships inside Jinja2 templates.
+    """
+    items = (
         db.query(MenuItem)
         .filter(MenuItem.is_visible == True, MenuItem.parent_id == None)
         .order_by(MenuItem.sort_order)
         .all()
     )
+    result = []
+    for item in items:
+        if item.item_type == "album" and item.album_id:
+            album = db.query(Album).filter(
+                Album.id == item.album_id, Album.is_public == True
+            ).first()
+            if album:
+                result.append({"label": item.label, "url": f"/a/{album.slug}", "external": False})
+        elif item.item_type == "page" and item.page_id:
+            page = db.query(Page).filter(
+                Page.id == item.page_id, Page.is_published == True
+            ).first()
+            if page:
+                result.append({"label": item.label, "url": f"/p/{page.slug}", "external": False})
+        elif item.item_type == "external" and item.ext_url:
+            result.append({"label": item.label, "url": item.ext_url, "external": True})
+    return result
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -105,8 +129,7 @@ async def album_view(slug: str, request: Request, db: Session = Depends(get_db))
     return templates.TemplateResponse(request, "public/album.html", {
         "site": site, "site_title": site["site_title"],
         "menu": menu, "album": album,
-        "media_items": media_items,
-        "sub_albums": sub_albums,
+        "media_items": media_items, "sub_albums": sub_albums,
         "breadcrumb": breadcrumb,
     })
 
@@ -131,7 +154,6 @@ async def shared_album(token: str, request: Request, db: Session = Depends(get_d
     return templates.TemplateResponse(request, "public/album.html", {
         "site": site, "site_title": site["site_title"],
         "menu": menu, "album": album,
-        "media_items": media_items,
-        "sub_albums": [], "breadcrumb": [],
+        "media_items": media_items, "sub_albums": [], "breadcrumb": [],
         "is_shared": True,
     })

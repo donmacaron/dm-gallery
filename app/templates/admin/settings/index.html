@@ -7,7 +7,7 @@
 </div>
 
 {% if saved %}
-<div style="background:rgba(51,255,51,0.06); border:1px solid var(--fg); color:var(--fg); padding:0.5rem 0.75rem; margin-bottom:1rem; font-size:0.85rem; letter-spacing:0.06em;">
+<div style="background:rgba(51,255,51,0.06);border:1px solid var(--fg);color:var(--fg);padding:0.5rem 0.75rem;margin-bottom:1.25rem;font-size:0.85rem;letter-spacing:0.06em;">
   ✓ Settings saved. Reload the public site to see changes.
 </div>
 {% endif %}
@@ -15,44 +15,37 @@
 <form action="/admin/settings/update" method="post" style="max-width:640px;">
 
   {% for group_name, fields in groups %}
-  <div style="margin-bottom:1.5rem;">
-    <div class="section-title" style="margin-bottom:0.75rem;"><span>// {{ group_name | upper }}</span></div>
+  <div style="margin-bottom:1.75rem;">
+    <div class="section-title" style="margin-bottom:0.85rem;"><span>// {{ group_name | upper }}</span></div>
 
     {% for key, ftype, label in fields %}
     <div class="form-group">
       <label class="form-label" for="{{ key }}">{{ label }}</label>
 
       {% if ftype == 'color' %}
-      <div style="display:flex; gap:0.5rem; align-items:center;">
-        <input type="color" id="{{ key }}" name="{{ key }}"
-               value="{{ current.get(key, '#000000') }}"
-               style="width:44px; height:36px; border:1px solid var(--border); background:none; cursor:pointer; padding:2px;">
-        <input type="text" id="{{ key }}_text"
-               value="{{ current.get(key, '') }}"
-               class="form-input" style="width:120px;"
-               oninput="document.getElementById('{{ key }}').value=this.value"
-               onchange="document.getElementById('{{ key }}').value=this.value">
-        <script>
-        document.getElementById('{{ key }}').addEventListener('input', function(){
-          document.getElementById('{{ key }}_text').value = this.value;
-        });
-        </script>
-      </div>
-      <!-- Hidden field that actually submits -->
-      <input type="hidden" name="{{ key }}" id="{{ key }}_hidden" value="{{ current.get(key, '') }}">
-      <script>
-      document.getElementById('{{ key }}').addEventListener('input', function(){
-        document.getElementById('{{ key }}_hidden').value = this.value;
-        document.getElementById('{{ key }}_text').value   = this.value;
-      });
-      document.getElementById('{{ key }}_text').addEventListener('input', function(){
-        document.getElementById('{{ key }}_hidden').value = this.value;
-      });
-      </script>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <input type="color" id="{{ key }}_picker"
+                 value="{{ current.get(key, '#000000') }}"
+                 style="width:44px;height:36px;border:1px solid var(--border);background:none;cursor:pointer;padding:2px;"
+                 oninput="document.getElementById('{{ key }}').value=this.value">
+          <input class="form-input" type="text" id="{{ key }}" name="{{ key }}"
+                 value="{{ current.get(key, '') }}"
+                 style="width:120px;"
+                 oninput="document.getElementById('{{ key }}_picker').value=this.value">
+        </div>
+
+      {% elif ftype == 'checkbox' %}
+        <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;margin-top:0.2rem;">
+          <input type="checkbox" id="{{ key }}" name="{{ key }}" value="1"
+                 {% if current.get(key, '0') == '1' %}checked{% endif %}>
+          <span style="font-size:0.85rem;color:#666;">Enabled</span>
+        </label>
+
       {% else %}
-      <input class="form-input" type="{{ ftype }}" id="{{ key }}" name="{{ key }}"
-             value="{{ current.get(key, '') }}"
-             {% if ftype == 'url' %}placeholder="https://"{% endif %}>
+        <input class="form-input" type="{{ ftype }}" id="{{ key }}" name="{{ key }}"
+               value="{{ current.get(key, '') }}"
+               {% if ftype == 'url' %}placeholder="https://"{% endif %}
+               {% if key == 'header_logo_text' %}placeholder="Leave empty to use Site Title"{% endif %}>
       {% endif %}
 
     </div>

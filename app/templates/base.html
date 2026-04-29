@@ -5,14 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}{{ site_title }}{% endblock %}</title>
   <meta name="description" content="{{ site.get('site_tagline', '') }}">
-
-  <!-- Open Graph -->
   <meta property="og:title"       content="{% block og_title %}{{ site_title }}{% endblock %}">
   <meta property="og:type"        content="website">
   <meta property="og:description" content="{{ site.get('site_tagline', '') }}">
-  {% if site.get('social_telegram_url') %}
-  <meta property="og:url" content="{{ site.get('social_telegram_url') }}">
-  {% endif %}
 
   <!-- Pixel fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,33 +32,55 @@
 
   <header class="site-header">
     <div class="header-inner">
+
+      <!-- Logo -->
       <a href="/" class="site-logo">
         <span class="logo-bracket">[</span>
-        <span class="logo-text">{{ site_title }}</span>
+        <span class="logo-text">
+          {%- set logo = site.get('header_logo_text', '') | trim -%}
+          {{ logo if logo else site_title }}
+        </span>
         <span class="logo-bracket">]</span>
       </a>
+
+      <!-- Social icons (header) -->
       <div class="header-social">
         {% if site.get('social_telegram_url') %}
-        <a href="{{ site.get('social_telegram_url') }}" target="_blank" rel="noopener" class="social-link" title="Telegram">TG</a>
+          <a href="{{ site.get('social_telegram_url') }}" target="_blank" rel="noopener"
+             class="social-link" title="Telegram">TG</a>
         {% endif %}
         {% if site.get('social_instagram_url') %}
-        <a href="{{ site.get('social_instagram_url') }}" target="_blank" rel="noopener" class="social-link" title="Instagram">IG</a>
+          <a href="{{ site.get('social_instagram_url') }}" target="_blank" rel="noopener"
+             class="social-link" title="Instagram">IG</a>
         {% endif %}
       </div>
     </div>
 
+    <!-- Optional tagline under header -->
+    {% if site.get('header_show_tagline') == '1' and site.get('site_tagline') %}
+    <div style="text-align:center; font-size:0.72rem; color:#333; letter-spacing:0.15em;
+                padding:0.2rem 1.5rem 0.35rem; border-top:1px solid var(--border);">
+      {{ site.get('site_tagline') }}
+    </div>
+    {% endif %}
+
+    <!-- Navigation -->
     <nav class="site-nav" aria-label="Main navigation">
-      <button class="nav-toggle" aria-label="Toggle menu" onclick="this.nextElementSibling.classList.toggle('is-open')">≡ MENU</button>
+      <!--
+        NOTE: NO inline onclick here.
+        The click handler is in gallery.js -> initNavToggle()
+        Having both causes double-toggle (open then immediately close).
+      -->
+      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+        ≡ MENU
+      </button>
       <ul class="nav-list" id="navList">
         {% for item in menu %}
         <li class="nav-item">
-          {% if item.item_type == 'album' and item.album %}
-            <a href="/a/{{ item.album.slug }}" class="nav-link">{{ item.label | upper }}</a>
-          {% elif item.item_type == 'page' and item.page %}
-            <a href="/p/{{ item.page.slug }}" class="nav-link">{{ item.label | upper }}</a>
-          {% elif item.item_type == 'external' and item.ext_url %}
-            <a href="{{ item.ext_url }}" class="nav-link" target="_blank" rel="noopener">{{ item.label | upper }} ↗</a>
-          {% endif %}
+          <a href="{{ item.url }}" class="nav-link"
+             {% if item.external %}target="_blank" rel="noopener"{% endif %}>
+            {{ item.label | upper }}{% if item.external %} ↗{% endif %}
+          </a>
         </li>
         {% endfor %}
       </ul>
@@ -79,10 +96,10 @@
       <span class="footer-copy">© {{ site_title }}</span>
       <div class="footer-social">
         {% if site.get('social_telegram_url') %}
-        <a href="{{ site.get('social_telegram_url') }}" target="_blank" rel="noopener" class="social-link">TELEGRAM</a>
+          <a href="{{ site.get('social_telegram_url') }}" target="_blank" rel="noopener" class="social-link">TELEGRAM</a>
         {% endif %}
         {% if site.get('social_instagram_url') %}
-        <a href="{{ site.get('social_instagram_url') }}" target="_blank" rel="noopener" class="social-link">INSTAGRAM</a>
+          <a href="{{ site.get('social_instagram_url') }}" target="_blank" rel="noopener" class="social-link">INSTAGRAM</a>
         {% endif %}
       </div>
     </div>
