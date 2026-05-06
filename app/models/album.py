@@ -7,31 +7,25 @@ from app.database import Base
 class Album(Base):
     __tablename__ = "albums"
 
-    id = Column(Integer, primary_key=True, index=True)
-    slug = Column(String, unique=True, nullable=False, index=True)
-    title = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-
-    # Self-referential: albums within albums
-    parent_id = Column(Integer, nullable=True, index=True)  # FK handled manually
-
-    # Cover image: stored as plain path (avoids circular FK with Media)
+    id               = Column(Integer, primary_key=True, index=True)
+    slug             = Column(String, unique=True, nullable=False, index=True)
+    title            = Column(String, nullable=False)
+    description      = Column(Text, nullable=True)
+    parent_id        = Column(Integer, nullable=True, index=True)
     cover_thumb_path = Column(String, nullable=True)
+    is_public        = Column(Boolean, default=False, index=True)
+    share_token      = Column(String, unique=True, nullable=True, index=True)
+    sort_order       = Column(Integer, default=0)
+    auto_zip         = Column(Boolean, default=False)
+    created_at       = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at       = Column(DateTime(timezone=True), onupdate=func.now())
 
-    is_public = Column(Boolean, default=False, index=True)
-    share_token = Column(String, unique=True, nullable=True, index=True)  # private sharing
-    sort_order = Column(Integer, default=0)
-    auto_zip = Column(Boolean, default=False)  # pre-build ZIP on upload
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # Relationships
+    # Many-to-many: one photo can appear in many albums
     media_items = relationship(
         "Media",
-        back_populates="album",
-        foreign_keys="Media.album_id",
-        order_by="Media.sort_order, Media.created_at",
+        secondary="album_media",
+        back_populates="albums",
+        lazy="select",
     )
     menu_items = relationship("MenuItem", back_populates="album")
 

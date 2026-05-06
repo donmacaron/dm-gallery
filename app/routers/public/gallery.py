@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -62,6 +63,28 @@ def get_menu(db: Session) -> list:
     return result
 
 
+def get_album_media(db: Session, album_id: int) -> list:
+    """Get media for an album via junction table, ordered by sort_order."""
+    rows = db.execute(
+        text("""
+            SELECT m.* FROM media m
+            JOIN album_media am ON am.media_id = m.id
+            WHERE am.album_id = :album_id
+              AND m.conversion_status = 'done'
+            ORDER BY am.sort_order, am.added_at
+        """),
+        {"album_id": album_id},
+    ).mappings().all()
+    # Convert to Media ORM objects via primary key lookup (cached in session)
+    media_ids = [r["id"] for r in rows]
+    if not media_ids:
+        return []
+    objs = db.query(Media).filter(Media.id.in_(media_ids)).all()
+    # Re-sort to match junction order
+    order_map = {mid: i for i, mid in enumerate(media_ids)}
+    return sorted(objs, key=lambda m: order_map.get(m.id, 9999))
+
+
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: Session = Depends(get_db)):
     site = get_site_ctx(db)
@@ -72,9 +95,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
             Album.id == int(featured_id), Album.is_public == True
         ).first()
         if featured:
-            media_items = db.query(Media).filter(
-                Media.album_id == featured.id, Media.conversion_status == "done",
-            ).order_by(Media.sort_order, Media.created_at).all()
+            media_items = get_album_media(db, featured.id)
             return templates.TemplateResponse(request, "public/home.html", {
                 "site": site, "site_title": site["site_title"],
                 "menu": menu, "albums": [],
@@ -101,11 +122,7 @@ async def album_view(slug: str, request: Request, db: Session = Depends(get_db))
         return templates.TemplateResponse(request, "public/404.html", {
             "site": site, "site_title": site["site_title"], "menu": menu,
         }, status_code=404)
-    media_items = (
-        db.query(Media)
-        .filter(Media.album_id == album.id, Media.conversion_status == "done")
-        .order_by(Media.sort_order, Media.created_at).all()
-    )
+    media_items = get_album_media(db, album.id)
     sub_albums = (
         db.query(Album)
         .filter(Album.parent_id == album.id, Album.is_public == True)
@@ -132,11 +149,7 @@ async def shared_album(token: str, request: Request, db: Session = Depends(get_d
         return templates.TemplateResponse(request, "public/404.html", {
             "site": site, "site_title": site["site_title"], "menu": menu,
         }, status_code=404)
-    media_items = (
-        db.query(Media)
-        .filter(Media.album_id == album.id, Media.conversion_status == "done")
-        .order_by(Media.sort_order, Media.created_at).all()
-    )
+    media_items = get_album_media(db, album.id)
     return templates.TemplateResponse(request, "public/album.html", {
         "site": site, "site_title": site["site_title"],
         "menu": menu, "album": album,

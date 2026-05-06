@@ -1,9 +1,11 @@
 # Import all models so SQLAlchemy registers them with Base.metadata
-from app.models.album import Album
-from app.models.media import Media
-from app.models.page import Page
-from app.models.menu import MenuItem
-from app.models.job import Job
-from app.models.setting import Setting
+# Order matters: album_media must be imported AFTER Album and Media
+from app.models.album      import Album       # noqa: F401
+from app.models.media      import Media       # noqa: F401
+from app.models.album_media import album_media_tbl  # noqa: F401
+from app.models.page       import Page        # noqa: F401
+from app.models.menu       import MenuItem    # noqa: F401
+from app.models.job        import Job         # noqa: F401
+from app.models.setting    import Setting     # noqa: F401
 
-__all__ = ["Album", "Media", "Page", "MenuItem", "Job", "Setting"]
+__all__ = ["Album", "Media", "album_media_tbl", "Page", "MenuItem", "Job", "Setting"]

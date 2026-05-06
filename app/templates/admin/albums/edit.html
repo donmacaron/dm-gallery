@@ -1,20 +1,58 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ album.title }}{% endblock %}
 
+{% block extra_css %}
+<style>
+/* Library picker grid */
+.lib-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 3px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--dim2);
+  border: 1px solid var(--border);
+}
+.lib-item {
+  position:relative; aspect-ratio:1;
+  overflow:hidden; border:1px solid var(--border);
+  cursor:pointer; background:#111;
+  transition:border-color 0.1s;
+}
+.lib-item:hover   { border-color:var(--border2); }
+.lib-item.sel     { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+.lib-item img     { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+.lib-item-check {
+  position:absolute; top:3px; left:3px;
+  width:16px; height:16px;
+  background:rgba(0,0,0,0.7); border:1px solid #555;
+  display:flex; align-items:center; justify-content:center;
+  font-size:0.65rem; color:var(--accent);
+  opacity:0; pointer-events:none; transition:opacity 0.1s;
+}
+.lib-item:hover .lib-item-check,
+.lib-item.sel   .lib-item-check  { opacity:1; }
+.lib-item.sel   .lib-item-check  { background:var(--accent); color:#000; border-color:var(--accent); }
+.lib-placeholder {
+  width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+  color:var(--border2); font-size:0.65rem;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="admin-page-title">
   <span>// {{ album.title | upper }}</span>
   <div style="display:flex; gap:0.5rem;">
-    {% if album.is_public %}
-      <a href="/a/{{ album.slug }}" target="_blank" class="btn btn-sm">View ↗</a>
-    {% endif %}
+    {% if album.is_public %}<a href="/a/{{ album.slug }}" target="_blank" class="btn btn-sm">View ↗</a>{% endif %}
     <a href="/admin/albums" class="btn btn-sm">← Albums</a>
   </div>
 </div>
 
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; max-width:960px;">
 
-  <!-- LEFT -->
+  <!-- LEFT: settings -->
   <div>
     <div class="section-title"><span>// SETTINGS</span></div>
     <form action="/admin/albums/{{ album.id }}/update" method="post" style="margin-top:0.75rem;">
@@ -45,27 +83,26 @@
       </div>
       <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-top:0.5rem;">
         <button type="submit" class="btn btn-primary">&gt; Save</button>
-        <a href="/admin/upload?album_id={{ album.id }}" class="btn btn-primary">&gt; Upload Files</a>
-        <a href="/admin/folder-import?path=" class="btn">&gt; Import Folder</a>
+        <a href="/admin/upload?album_id={{ album.id }}" class="btn btn-primary">&gt; Upload Here</a>
       </div>
     </form>
 
-    <!-- ZIP section -->
+    <!-- ZIP -->
     <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border);">
       <div class="section-title"><span>// ZIP ARCHIVE</span></div>
       {% include "admin/_zip_status.html" %}
     </div>
 
-    <!-- Danger zone -->
+    <!-- Danger -->
     <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border);">
       <form action="/admin/albums/{{ album.id }}/delete" method="post"
-            onsubmit="return confirm('Delete album \'{{ album.title }}\'? Media will be unassigned, not deleted.')">
+            onsubmit="return confirm('Delete album? Media will stay in library.')">
         <button type="submit" class="btn btn-sm btn-danger">&times; Delete Album</button>
       </form>
     </div>
   </div>
 
-  <!-- RIGHT -->
+  <!-- RIGHT: sharing -->
   <div>
     <div class="section-title"><span>// SHARING</span></div>
     <div style="margin-top:0.75rem;">
@@ -77,15 +114,14 @@
           {% if album.is_public %}PUBLIC{% else %}PRIVATE{% endif %}
         </span>
       </div>
-      <div style="font-size:0.72rem; color:#333; margin-bottom:0.3rem;">Private share link:</div>
+      <div style="font-size:0.72rem; color:#333; margin-bottom:0.3rem;">Private link:</div>
       <code id="share-token-{{ album.id }}"
-            style="font-size:0.7rem; color:var(--accent); word-break:break-all; display:block; margin-bottom:0.4rem;">
+            style="font-size:0.7rem;color:var(--accent);word-break:break-all;display:block;margin-bottom:0.4rem;">
         {% if album.share_token %}/s/{{ album.share_token }}{% else %}not generated{% endif %}
       </code>
       <button class="btn btn-sm"
               hx-post="/admin/albums/{{ album.id }}/regen-token"
-              hx-target="#share-token-{{ album.id }}"
-              hx-swap="outerHTML">↻ Regen Link</button>
+              hx-target="#share-token-{{ album.id }}" hx-swap="outerHTML">↻ Regen Link</button>
     </div>
 
     {% if sub_albums %}
@@ -94,7 +130,6 @@
       {% for sub in sub_albums %}
       <div style="padding:0.3rem 0; border-bottom:1px solid var(--border); font-size:0.82rem;">
         <a href="/admin/albums/{{ sub.id }}" style="color:var(--fg);">{{ sub.title }}</a>
-        <span style="color:#2a2a2a; font-size:0.65rem;"> ({{ sub.media_items | length }})</span>
       </div>
       {% endfor %}
     </div>
@@ -103,10 +138,10 @@
 
 </div>
 
-<!-- Media grid -->
+<!-- CURRENT MEDIA -->
 <div style="margin-top:2rem;">
   <div class="section-title">
-    <span>// MEDIA ({{ media_items | length }})</span>
+    <span>// IN THIS ALBUM ({{ media_items|length }})</span>
     <a href="/admin/upload?album_id={{ album.id }}" class="btn btn-sm btn-primary">+ Upload</a>
   </div>
 
@@ -116,9 +151,10 @@
     <div style="position:relative;aspect-ratio:1;overflow:hidden;border:1px solid var(--border);background:var(--dim2);"
          id="media-cell-{{ item.id }}">
       {% if item.thumb_path %}
-        <img src="/media/{{ item.thumb_path }}" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy">
+        <img src="/media/{{ item.thumb_path }}" loading="lazy"
+             style="width:100%;height:100%;object-fit:cover;display:block;">
       {% else %}
-        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:0.55rem;color:#333;">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:#333;">
           {{ item.media_type[:3]|upper }}
         </div>
       {% endif %}
@@ -132,7 +168,7 @@
                 title="Remove from album">×</button>
       </div>
       {% if item.conversion_status != 'done' %}
-      <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.75);padding:1px 3px;text-align:center;">
+      <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.75);padding:1px 3px;">
         <span class="badge badge-{{ item.conversion_status }}" style="font-size:0.5rem;">{{ item.conversion_status|upper }}</span>
       </div>
       {% endif %}
@@ -140,10 +176,81 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="empty-state" style="padding:2rem;">
-    <h3>[ EMPTY ]</h3>
-    <a href="/admin/upload?album_id={{ album.id }}" class="btn btn-primary">&gt; Upload Files</a>
-  </div>
+  <div style="color:#333; font-size:0.82rem; padding:1rem 0;">[ Empty — upload or add from library below ]</div>
   {% endif %}
 </div>
+
+<!-- ADD FROM LIBRARY -->
+{% if library_media %}
+<div style="margin-top:2rem;">
+  <div class="section-title">
+    <span>// ADD FROM LIBRARY ({{ library_media|length }} available)</span>
+    <button class="btn btn-sm" onclick="toggleLibrary()">Show / Hide</button>
+  </div>
+
+  <div id="libraryPanel" style="margin-top:0.75rem; display:none;">
+    <div style="font-size:0.75rem; color:#333; margin-bottom:0.5rem;">
+      Click photos to select, then click &gt; Add Selected.
+    </div>
+
+    <div class="lib-grid" id="libGrid">
+      {% for item in library_media %}
+      <div class="lib-item" data-id="{{ item.id }}" onclick="libToggle(this)">
+        {% if item.thumb_path %}
+          <img src="/media/{{ item.thumb_path }}" loading="lazy" alt="{{ item.original_filename }}">
+        {% else %}
+          <div class="lib-placeholder">{{ item.media_type[:3]|upper }}</div>
+        {% endif %}
+        <div class="lib-item-check">✓</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <form action="/admin/albums/{{ album.id }}/add-media-bulk" method="post"
+          style="margin-top:0.75rem; display:flex; gap:0.6rem; align-items:center;">
+      <input type="hidden" name="media_ids" id="libSelectedIds">
+      <button type="submit" class="btn btn-primary" id="libAddBtn" disabled
+              onclick="document.getElementById('libSelectedIds').value = Array.from(libSelected).join(',')">
+        &gt; Add Selected (<span id="libCount">0</span>)
+      </button>
+      <button type="button" class="btn btn-sm" onclick="libSelectAll()">Select All</button>
+      <button type="button" class="btn btn-sm" onclick="libClearAll()">Clear</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let libSelected = new Set();
+
+function toggleLibrary() {
+  const p = document.getElementById('libraryPanel');
+  p.style.display = p.style.display === 'none' ? '' : 'none';
+}
+
+function libToggle(el) {
+  const id = el.dataset.id;
+  if (libSelected.has(id)) { libSelected.delete(id); el.classList.remove('sel'); }
+  else                     { libSelected.add(id);    el.classList.add('sel'); }
+  updateLibCount();
+}
+
+function libSelectAll() {
+  document.querySelectorAll('.lib-item').forEach(el => { el.classList.add('sel'); libSelected.add(el.dataset.id); });
+  updateLibCount();
+}
+
+function libClearAll() {
+  document.querySelectorAll('.lib-item').forEach(el => { el.classList.remove('sel'); });
+  libSelected.clear(); updateLibCount();
+}
+
+function updateLibCount() {
+  document.getElementById('libCount').textContent = libSelected.size;
+  document.getElementById('libAddBtn').disabled   = libSelected.size === 0;
+}
+</script>
 {% endblock %}

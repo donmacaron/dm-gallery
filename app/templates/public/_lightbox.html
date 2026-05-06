@@ -1,5 +1,5 @@
 <!-- Lightbox overlay -->
-<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Image viewer">
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true">
 
   <div class="lightbox-controls">
     <span class="lightbox-counter" id="lbCounter">1 / 1</span>
@@ -7,23 +7,22 @@
     <button class="lightbox-close" onclick="closeLightbox()" title="Close (Esc)">[ ESC ]</button>
   </div>
 
-  <button class="lightbox-nav lightbox-prev" onclick="lightboxNav(-1)" title="Previous (←)">◄</button>
+  <button class="lightbox-nav lightbox-prev" onclick="lightboxNav(-1)">◄</button>
 
-  <div style="position:relative; display:flex; align-items:center; justify-content:center; max-width:90vw; max-height:80vh;">
+  <div style="position:relative;display:flex;align-items:center;justify-content:center;max-width:90vw;max-height:80vh;">
     <img class="lightbox-img" id="lbImg" src="" alt="" draggable="false"
-         style="opacity:0; transition:opacity 0.2s;" onload="this.style.opacity=1">
-    <!-- Loading spinner shown while image loads -->
-    <div id="lbSpinner" style="position:absolute; font-size:0.8rem; color:#333; letter-spacing:0.1em;">
+         style="opacity:0;transition:opacity 0.2s;" onload="this.style.opacity=1">
+    <div id="lbSpinner" style="position:absolute;font-size:0.8rem;color:#333;letter-spacing:0.1em;">
       loading<span class="blink">█</span>
     </div>
   </div>
 
-  <button class="lightbox-nav lightbox-next" onclick="lightboxNav(1)" title="Next (→)">►</button>
+  <button class="lightbox-nav lightbox-next" onclick="lightboxNav(1)">►</button>
 
   <div class="lightbox-bottom">
-    <a id="lbDl2k"   href="#" class="lightbox-dl hi"  download title="Download 2K WebP version">⬇ 2K VERSION</a>
-    <a id="lbDlOrig" href="#" class="lightbox-dl"     download title="Download original file">⬇ ORIGINAL</a>
-    <span id="lbDims" style="font-size:0.7rem; color:#333; letter-spacing:0.06em;"></span>
+    <a id="lbDl2k"   href="#" class="lightbox-dl hi" download>⬇ 2K VERSION</a>
+    <a id="lbDlOrig" href="#" class="lightbox-dl"    download>⬇ ORIGINAL</a>
+    <span id="lbDims" style="font-size:0.7rem;color:#333;letter-spacing:0.06em;"></span>
   </div>
 
 </div>
@@ -35,12 +34,14 @@ function openLightbox(idx) {
   _lbIdx = idx;
   _lbUpdate();
   document.getElementById('lightbox').classList.add('is-open');
+  // Task 4: hide CRT scanlines + vignette while lightbox is open
+  document.body.classList.add('lightbox-active');
   document.body.style.overflow = 'hidden';
-  document.getElementById('lightbox').focus();
 }
 
 function closeLightbox() {
   document.getElementById('lightbox').classList.remove('is-open');
+  document.body.classList.remove('lightbox-active');
   document.body.style.overflow = '';
 }
 
@@ -51,49 +52,35 @@ function lightboxNav(dir) {
 }
 
 function _lbUpdate() {
-  const m      = MEDIA[_lbIdx];
-  const img    = document.getElementById('lbImg');
-  const spinner= document.getElementById('lbSpinner');
-
-  // Show spinner while loading
+  const m = MEDIA[_lbIdx];
+  const img = document.getElementById('lbImg');
+  const spinner = document.getElementById('lbSpinner');
   img.style.opacity = '0';
   spinner.style.display = 'block';
-
-  const src = m.webPath ? '/media/' + m.webPath : '';
-  img.src = src;
+  img.src = m.webPath ? '/media/' + m.webPath : '';
   img.onload  = () => { spinner.style.display = 'none'; img.style.opacity = '1'; };
   img.onerror = () => { spinner.style.display = 'none'; img.style.opacity = '0.3'; };
-
   document.getElementById('lbCounter').textContent  = (_lbIdx + 1) + ' / ' + MEDIA.length;
   document.getElementById('lbFilename').textContent = m.name || '';
   document.getElementById('lbDl2k').href            = '/download/' + m.id + '/web';
   document.getElementById('lbDlOrig').href          = '/download/' + m.id + '/original';
-
-  // Show dimensions if available
   const dims = document.getElementById('lbDims');
   dims.textContent = m.w && m.h ? m.w + '×' + m.h : '';
-
   // Preload neighbours
-  const preload = (i) => {
+  [_lbIdx + 1, _lbIdx - 1].forEach(i => {
     const p = MEDIA[(i + MEDIA.length) % MEDIA.length];
     if (p && p.webPath) { const x = new Image(); x.src = '/media/' + p.webPath; }
-  };
-  preload(_lbIdx + 1);
-  preload(_lbIdx - 1);
+  });
 }
 
-// Keyboard
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', e => {
   if (!document.getElementById('lightbox').classList.contains('is-open')) return;
-  if (e.key === 'Escape')     { closeLightbox();    return; }
-  if (e.key === 'ArrowLeft')  { lightboxNav(-1);    return; }
-  if (e.key === 'ArrowRight') { lightboxNav(1);     return; }
-  if (e.key === 'ArrowUp')    { lightboxNav(-1);    return; }
-  if (e.key === 'ArrowDown')  { lightboxNav(1);     return; }
+  if (e.key === 'Escape')     { closeLightbox(); }
+  if (e.key === 'ArrowLeft')  { lightboxNav(-1); }
+  if (e.key === 'ArrowRight') { lightboxNav(1); }
 });
 
-// Click backdrop to close
-document.getElementById('lightbox').addEventListener('click', (e) => {
+document.getElementById('lightbox').addEventListener('click', e => {
   if (e.target.id === 'lightbox') closeLightbox();
 });
 </script>
