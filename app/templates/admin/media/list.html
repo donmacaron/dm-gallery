@@ -3,175 +3,211 @@
 
 {% block extra_css %}
 <style>
-/* Grid layout */
 .media-grid-admin {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 4px;
   margin-top: 1rem;
+  /* Extra bottom padding so last row isn't hidden behind the fixed bulk bar */
+  padding-bottom: 80px;
 }
+
 .media-card {
   position: relative; aspect-ratio: 1;
   overflow: hidden; border: 1px solid var(--border);
   background: var(--dim2); cursor: pointer;
   transition: border-color 0.12s;
+  user-select: none;
 }
-.media-card:hover     { border-color: var(--border2); }
-.media-card.selected  { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.media-card:hover    { border-color: var(--border2); }
+.media-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 
 .media-card img {
-  width:100%; height:100%; object-fit:cover; display:block;
-  pointer-events:none;
+  width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none;
 }
 .media-card-placeholder {
-  width:100%; height:100%;
-  display:flex; align-items:center; justify-content:center;
-  color:var(--border2); font-size:0.7rem; letter-spacing:0.1em;
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--border2); font-size: 0.7rem; letter-spacing: 0.1em;
 }
 
-/* Checkbox in top-left */
+/* Checkmark in top-left */
 .media-card-check {
-  position:absolute; top:5px; left:5px;
-  width:18px; height:18px;
-  background:rgba(0,0,0,0.7); border:1px solid #555;
-  display:flex; align-items:center; justify-content:center;
-  font-size:0.7rem; color:var(--accent);
-  opacity:0; transition:opacity 0.12s;
-  pointer-events:none;
+  position: absolute; top: 5px; left: 5px;
+  width: 18px; height: 18px;
+  background: rgba(0,0,0,0.75); border: 1px solid #555;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; color: var(--accent);
+  opacity: 0; transition: opacity 0.12s; pointer-events: none;
 }
 .media-card:hover .media-card-check,
-.media-card.selected .media-card-check { opacity:1; }
-.media-card.selected .media-card-check { background:var(--accent); color:#000; border-color:var(--accent); }
+.media-card.selected .media-card-check { opacity: 1; }
+.media-card.selected .media-card-check { background: var(--accent); color: #000; border-color: var(--accent); }
 
-/* Album tags overlay */
+/* Album tags on hover */
 .media-card-albums {
-  position:absolute; bottom:0; left:0; right:0;
-  background:linear-gradient(transparent, rgba(0,0,0,0.8));
-  padding:1rem 4px 4px;
-  display:flex; flex-wrap:wrap; gap:2px;
-  opacity:0; transition:opacity 0.12s;
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  padding: 1.2rem 4px 4px;
+  display: flex; flex-wrap: wrap; gap: 2px;
+  opacity: 0; transition: opacity 0.12s;
+  pointer-events: none;
 }
-.media-card:hover .media-card-albums { opacity:1; }
+.media-card:hover .media-card-albums { opacity: 1; }
 .album-tag {
-  font-size:0.55rem; padding:1px 4px;
-  background:rgba(255,102,0,0.7); color:#fff;
-  border-radius:0; letter-spacing:0.04em;
-  white-space:nowrap;
+  font-size: 0.55rem; padding: 1px 4px;
+  background: rgba(255,102,0,0.8); color: #fff;
+  white-space: nowrap; letter-spacing: 0.04em;
 }
 
 /* Conversion badge */
 .conv-badge {
-  position:absolute; top:5px; right:5px;
-  font-size:0.55rem; padding:1px 4px; letter-spacing:0.04em;
+  position: absolute; top: 5px; right: 5px;
+  font-size: 0.55rem; padding: 1px 4px; letter-spacing: 0.04em;
+  pointer-events: none;
 }
-.conv-pending    { background:rgba(255,102,0,0.85); color:#fff; }
-.conv-processing { background:rgba(255,255,0,0.85); color:#000; }
-.conv-error      { background:rgba(255,51,51,0.85);  color:#fff; }
+.conv-pending    { background: rgba(255,102,0,0.9); color: #fff; }
+.conv-processing { background: rgba(255,220,0,0.9); color: #000; }
+.conv-error      { background: rgba(255,40,40,0.9);  color: #fff; }
 
-/* Bulk action bar (sticky bottom) */
+/* =======================================================
+   BULK BAR — fixed at bottom, slides up when items selected
+   position:fixed works even when body has overflow-x:hidden
+   ======================================================= */
 .bulk-bar {
-  position:sticky; bottom:0; left:0; right:0;
-  background:var(--dim); border-top:1px solid var(--accent);
-  padding:0.6rem 1rem; display:flex; align-items:center; gap:0.75rem;
-  flex-wrap:wrap; z-index:100;
-  transform:translateY(100%);
-  transition:transform 0.2s;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #0d0d0d;
+  border-top: 2px solid var(--accent);
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  z-index: 9990;
+  /* Start hidden below viewport */
+  transform: translateY(110%);
+  transition: transform 0.22s ease;
+  box-shadow: 0 -4px 24px rgba(255,102,0,0.12);
 }
-.bulk-bar.visible { transform:translateY(0); }
-.bulk-bar-count { font-size:0.85rem; color:var(--accent); letter-spacing:0.06em; flex:1; }
+.bulk-bar.visible {
+  transform: translateY(0);
+}
+.bulk-count {
+  font-size: 0.9rem;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  flex: 1;
+  white-space: nowrap;
+}
+.bulk-album-select {
+  font-size: 0.82rem;
+  padding: 0.3rem 0.6rem;
+  width: 190px;
+  background: #111;
+  border: 1px solid var(--border2);
+  color: var(--fg);
+  font-family: var(--font);
+}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="admin-page-title">
   <span>// MEDIA LIBRARY</span>
-  <a href="/admin/upload" class="btn btn-primary">&gt; Upload</a>
+  <div style="display:flex; gap:0.5rem;">
+    <button class="btn btn-sm" onclick="toggleSelectAll()" id="selAllBtn">Select All</button>
+    <a href="/admin/upload" class="btn btn-primary">&gt; Upload</a>
+  </div>
 </div>
 
 <!-- Filter bar -->
 <div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
-  <a href="/admin/media"                      class="btn btn-sm {% if not filter_type and not unassigned %}btn-primary{% endif %}">ALL</a>
-  <a href="/admin/media?media_type=photo"     class="btn btn-sm {% if filter_type=='photo'  %}btn-primary{% endif %}">PHOTO</a>
-  <a href="/admin/media?media_type=video"     class="btn btn-sm {% if filter_type=='video'  %}btn-primary{% endif %}">VIDEO</a>
-  <a href="/admin/media?media_type=gif"       class="btn btn-sm {% if filter_type=='gif'    %}btn-primary{% endif %}">GIF</a>
-  <a href="/admin/media?media_type=audio"     class="btn btn-sm {% if filter_type=='audio'  %}btn-primary{% endif %}">AUDIO</a>
-  <a href="/admin/media?unassigned=1"         class="btn btn-sm {% if unassigned=='1'       %}btn-primary{% endif %}">UNASSIGNED</a>
+  <a href="/admin/media"                  class="btn btn-sm {% if not filter_type and not unassigned %}btn-primary{% endif %}">ALL</a>
+  <a href="/admin/media?media_type=photo" class="btn btn-sm {% if filter_type=='photo'  %}btn-primary{% endif %}">PHOTO</a>
+  <a href="/admin/media?media_type=video" class="btn btn-sm {% if filter_type=='video'  %}btn-primary{% endif %}">VIDEO</a>
+  <a href="/admin/media?media_type=gif"   class="btn btn-sm {% if filter_type=='gif'    %}btn-primary{% endif %}">GIF</a>
+  <a href="/admin/media?media_type=audio" class="btn btn-sm {% if filter_type=='audio'  %}btn-primary{% endif %}">AUDIO</a>
+  <a href="/admin/media?unassigned=1"     class="btn btn-sm {% if unassigned=='1'       %}btn-primary{% endif %}">UNASSIGNED</a>
   <span style="color:#2a2a2a; font-size:0.72rem; margin-left:0.5rem;">{{ media_items|length }} files</span>
-
-  <button class="btn btn-sm" id="selectAllBtn" style="margin-left:auto;" onclick="toggleSelectAll()">Select All</button>
 </div>
 
 {% if media_items %}
-<!-- Grid -->
+
+<!-- Photo grid -->
 <div class="media-grid-admin" id="mediaGridAdmin">
   {% for item in media_items %}
   <div class="media-card" data-id="{{ item.id }}" onclick="toggleSelect(this)">
-    <!-- Thumbnail -->
+
     {% if item.thumb_path %}
       <img src="/media/{{ item.thumb_path }}" alt="{{ item.original_filename }}" loading="lazy">
     {% else %}
-      <div class="media-card-placeholder">
-        {{ item.media_type[:3]|upper }}
-      </div>
+      <div class="media-card-placeholder">{{ item.media_type[:3]|upper }}</div>
     {% endif %}
 
-    <!-- Checkbox indicator -->
     <div class="media-card-check">✓</div>
 
-    <!-- Conversion badge -->
     {% if item.conversion_status != 'done' %}
-    <div class="conv-badge conv-{{ item.conversion_status }}">
-      {{ item.conversion_status|upper }}
-    </div>
+    <div class="conv-badge conv-{{ item.conversion_status }}">{{ item.conversion_status|upper }}</div>
     {% endif %}
 
-    <!-- Album tags -->
     {% set item_albums = media_album_map.get(item.id, []) %}
     {% if item_albums %}
     <div class="media-card-albums">
       {% for a in item_albums %}
-      <span class="album-tag">{{ a.title[:15] }}</span>
+        <span class="album-tag">{{ a.title[:16] }}</span>
       {% endfor %}
     </div>
     {% endif %}
+
   </div>
   {% endfor %}
-</div>
-
-<!-- Bulk action bar -->
-<div class="bulk-bar" id="bulkBar">
-  <span class="bulk-bar-count" id="bulkCount">0 selected</span>
-
-  <form id="bulkForm" action="/admin/api/media/bulk-action" method="post"
-        style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
-    <input type="hidden" name="media_ids" id="bulkIds">
-    <input type="hidden" name="action"    id="bulkAction">
-    <input type="hidden" name="album_id"  id="bulkAlbumId">
-
-    <!-- Add to album -->
-    <select id="bulkAlbumSelect" class="form-input" style="font-size:0.8rem; padding:0.25rem 0.5rem; width:180px;">
-      <option value="">-- choose album --</option>
-      {% for album in albums %}
-      <option value="{{ album.id }}">{{ album.title[:25] }}</option>
-      {% endfor %}
-    </select>
-    <button type="button" class="btn btn-sm btn-primary" onclick="bulkSubmit('add_to_album')">&gt; Add to Album</button>
-
-    <!-- Delete -->
-    <button type="button" class="btn btn-sm btn-danger"
-            onclick="if(confirm('Delete selected files?')) bulkSubmit('delete')">
-      &times; Delete
-    </button>
-  </form>
 </div>
 
 {% else %}
 <div class="empty-state">
   <h3>[ NO MEDIA ]</h3>
-  <p>Upload your first files.</p>
+  <p>Upload your first files to get started.</p>
   <a href="/admin/upload" class="btn btn-primary">&gt; Upload</a>
 </div>
 {% endif %}
+
+<!-- =====================================================
+     BULK ACTION BAR  (fixed, slides up when items selected)
+     ===================================================== -->
+<div class="bulk-bar" id="bulkBar">
+
+  <span class="bulk-count" id="bulkCount">0 selected</span>
+
+  <!-- Add to album -->
+  <select id="bulkAlbumSelect" class="bulk-album-select">
+    <option value="">-- choose album --</option>
+    {% for album in albums %}
+    <option value="{{ album.id }}">{{ album.title[:28] }}</option>
+    {% endfor %}
+  </select>
+
+  <button class="btn btn-sm btn-primary" onclick="bulkAddToAlbum()">
+    &gt; Add to Album
+  </button>
+
+  <button class="btn btn-sm btn-danger"
+          onclick="if(confirm('Delete ' + selected.size + ' file(s)? This cannot be undone.')) bulkDelete()">
+    &times; Delete
+  </button>
+
+  <button class="btn btn-sm" onclick="clearSelection()" style="border-color:#333; color:#555;">
+    Cancel
+  </button>
+
+  <!-- Hidden form for submission -->
+  <form id="bulkForm" action="/admin/api/media/bulk-action" method="post" style="display:none;">
+    <input type="hidden" name="media_ids" id="bulkIds">
+    <input type="hidden" name="action"    id="bulkAction">
+    <input type="hidden" name="album_id"  id="bulkAlbumId">
+  </form>
+
+</div>
 
 {% endblock %}
 
@@ -181,36 +217,64 @@ let selected = new Set();
 
 function toggleSelect(card) {
   const id = card.dataset.id;
-  if (selected.has(id)) { selected.delete(id); card.classList.remove('selected'); }
-  else                  { selected.add(id);    card.classList.add('selected'); }
-  updateBulkBar();
+  if (selected.has(id)) {
+    selected.delete(id);
+    card.classList.remove('selected');
+  } else {
+    selected.add(id);
+    card.classList.add('selected');
+  }
+  updateBar();
 }
 
 function toggleSelectAll() {
   const cards = document.querySelectorAll('.media-card');
-  if (selected.size === cards.length) {
-    cards.forEach(c => { c.classList.remove('selected'); selected.delete(c.dataset.id); });
-  } else {
-    cards.forEach(c => { c.classList.add('selected'); selected.add(c.dataset.id); });
-  }
-  updateBulkBar();
+  const allSelected = (selected.size === cards.length);
+  cards.forEach(c => {
+    if (allSelected) {
+      c.classList.remove('selected');
+      selected.delete(c.dataset.id);
+    } else {
+      c.classList.add('selected');
+      selected.add(c.dataset.id);
+    }
+  });
+  document.getElementById('selAllBtn').textContent = allSelected ? 'Select All' : 'Deselect All';
+  updateBar();
 }
 
-function updateBulkBar() {
+function clearSelection() {
+  document.querySelectorAll('.media-card.selected').forEach(c => c.classList.remove('selected'));
+  selected.clear();
+  document.getElementById('selAllBtn').textContent = 'Select All';
+  updateBar();
+}
+
+function updateBar() {
   const bar = document.getElementById('bulkBar');
   document.getElementById('bulkCount').textContent = selected.size + ' selected';
-  bar.classList.toggle('visible', selected.size > 0);
+  if (selected.size > 0) {
+    bar.classList.add('visible');
+  } else {
+    bar.classList.remove('visible');
+  }
 }
 
-function bulkSubmit(action) {
+function bulkAddToAlbum() {
+  const aid = document.getElementById('bulkAlbumSelect').value;
+  if (!aid) { alert('Please choose an album first.'); return; }
   if (!selected.size) return;
   document.getElementById('bulkIds').value    = Array.from(selected).join(',');
-  document.getElementById('bulkAction').value = action;
-  if (action === 'add_to_album') {
-    const aid = document.getElementById('bulkAlbumSelect').value;
-    if (!aid) { alert('Choose an album first'); return; }
-    document.getElementById('bulkAlbumId').value = aid;
-  }
+  document.getElementById('bulkAction').value = 'add_to_album';
+  document.getElementById('bulkAlbumId').value = aid;
+  document.getElementById('bulkForm').submit();
+}
+
+function bulkDelete() {
+  if (!selected.size) return;
+  document.getElementById('bulkIds').value    = Array.from(selected).join(',');
+  document.getElementById('bulkAction').value = 'delete';
+  document.getElementById('bulkAlbumId').value = '';
   document.getElementById('bulkForm').submit();
 }
 </script>
