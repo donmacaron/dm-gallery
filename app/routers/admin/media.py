@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -33,24 +33,30 @@ async def media_list(
     if media_type:
         q = q.filter(Media.media_type == media_type)
     if unassigned == "1":
-        # Media not linked to ANY album in junction table
-        linked_ids = [r[0] for r in db.execute(text("SELECT DISTINCT media_id FROM album_media")).fetchall()]
+        linked_ids = [r[0] for r in db.execute(
+            text("SELECT DISTINCT media_id FROM album_media")
+        ).fetchall()]
         if linked_ids:
             q = q.filter(~Media.id.in_(linked_ids))
 
     media_items = q.order_by(Media.created_at.desc()).all()
-    albums = db.query(Album).order_by(Album.title).all()
+    albums      = db.query(Album).order_by(Album.title).all()
 
-    # For each media item, collect its album memberships
+    # Build album membership map using Python-side iteration (avoids SQLite IN ? syntax issue)
     media_album_map: dict = {}
     if media_items:
-        mids = [m.id for m in media_items]
-        rows = db.execute(
-            text("SELECT am.media_id, a.id, a.title FROM album_media am JOIN albums a ON a.id=am.album_id WHERE am.media_id IN :ids"),
-            {"ids": tuple(mids) if len(mids) > 1 else (mids[0], mids[0])},
+        # Load ALL album_media rows once, then filter in Python
+        all_links = db.execute(
+            text("""
+                SELECT am.media_id, a.id, a.title
+                FROM album_media am
+                JOIN albums a ON a.id = am.album_id
+            """)
         ).fetchall()
-        for mid, aid, atitle in rows:
-            media_album_map.setdefault(mid, []).append({"id": aid, "title": atitle})
+        mids = {m.id for m in media_items}
+        for mid, aid, atitle in all_links:
+            if mid in mids:
+                media_album_map.setdefault(mid, []).append({"id": aid, "title": atitle})
 
     return templates.TemplateResponse(request, "admin/media/list.html", {
         "admin":           admin,
@@ -67,12 +73,11 @@ async def media_list(
 @router.post("/api/media/bulk-action", response_class=HTMLResponse)
 async def media_bulk_action(
     request:   Request,
-    action:    str = Form(""),        # "delete" | "add_to_album"
-    media_ids: str = Form(""),        # comma-separated IDs
+    action:    str           = Form(""),
+    media_ids: str           = Form(""),
     album_id:  Optional[str] = Form(None),
-    db:        Session = Depends(get_db),
+    db:        Session       = Depends(get_db),
 ):
-    """Bulk delete or bulk add-to-album."""
     admin = require_admin(request)
     if not admin:
         return HTMLResponse("", status_code=401)
