@@ -1,9 +1,9 @@
 from __future__ import annotations
 import secrets
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from slugify import slugify
 from sqlalchemy import text
@@ -29,7 +29,7 @@ def _guard(request: Request):
 
 
 def _album_media(db: Session, album_id: int) -> list:
-    """All media linked to an album via junction table."""
+    """Media linked to album via junction table, ordered by sort_order."""
     rows = db.execute(
         text("SELECT media_id FROM album_media WHERE album_id = :aid ORDER BY sort_order, added_at"),
         {"aid": album_id},
@@ -40,6 +40,55 @@ def _album_media(db: Session, album_id: int) -> list:
     objs = db.query(Media).filter(Media.id.in_(media_ids)).all()
     order_map = {mid: i for i, mid in enumerate(media_ids)}
     return sorted(objs, key=lambda m: order_map.get(m.id, 9999))
+
+
+def _get_sub_album_ids(db: Session, album_id: int) -> list:
+    """Recursively collect all descendant album IDs."""
+    result = []
+    queue = [album_id]
+    while queue:
+        current = queue.pop()
+        children = db.execute(
+            text("SELECT id FROM albums WHERE parent_id = :pid"),
+            {"pid": current}
+        ).fetchall()
+        for row in children:
+            cid = row[0]
+            result.append(cid)
+            queue.append(cid)
+    return result
+
+
+def _sub_album_media(db: Session, album_id: int) -> list:
+    """All converted photos from all nested sub-albums (recursive)."""
+    sub_ids = _get_sub_album_ids(db, album_id)
+    if not sub_ids:
+        return []
+    # Build sub-album name map
+    sub_albums = db.query(Album).filter(Album.id.in_(sub_ids)).all()
+    album_name_map = {a.id: a.title for a in sub_albums}
+
+    result = []
+    for sub_id in sub_ids:
+        rows = db.execute(
+            text("SELECT media_id FROM album_media WHERE album_id = :aid ORDER BY sort_order, added_at"),
+            {"aid": sub_id},
+        ).fetchall()
+        media_ids = [r[0] for r in rows]
+        if not media_ids:
+            continue
+        objs = db.query(Media).filter(
+            Media.id.in_(media_ids),
+            Media.conversion_status == "done",
+            Media.thumb_path.isnot(None),
+        ).all()
+        for m in objs:
+            result.append({
+                "media":      m,
+                "album_id":   sub_id,
+                "album_name": album_name_map.get(sub_id, ""),
+            })
+    return result
 
 
 # ── LIST ──
@@ -93,15 +142,14 @@ async def album_detail(album_id: int, request: Request, db: Session = Depends(ge
     album = db.query(Album).filter(Album.id == album_id).first()
     if not album: return RedirectResponse("/admin/albums", status_code=302)
 
-    media_items = _album_media(db, album_id)
-    sub_albums  = db.query(Album).filter(Album.parent_id == album_id).order_by(Album.sort_order).all()
-    all_albums  = db.query(Album).filter(Album.id != album_id).order_by(Album.title).all()
-    zip_job = (
+    media_items   = _album_media(db, album_id)
+    sub_albums    = db.query(Album).filter(Album.parent_id == album_id).order_by(Album.sort_order).all()
+    all_albums    = db.query(Album).filter(Album.id != album_id).order_by(Album.title).all()
+    zip_job       = (
         db.query(Job).filter(Job.job_type == "zip", Job.target_id == album_id)
         .order_by(Job.created_at.desc()).first()
     )
-    # Media NOT in this album (for "add from library" panel)
-    linked_ids = [m.id for m in media_items]
+    linked_ids    = [m.id for m in media_items]
     library_media = (
         db.query(Media)
         .filter(Media.conversion_status == "done")
@@ -109,11 +157,15 @@ async def album_detail(album_id: int, request: Request, db: Session = Depends(ge
         .order_by(Media.created_at.desc())
         .all()
     )
+    # Photos from sub-albums (for cover picker on parent albums)
+    sub_media = _sub_album_media(db, album_id)
+
     return templates.TemplateResponse(request, "admin/albums/edit.html", {
         "admin": admin, "site_title": settings.site_title, "active": "albums",
         "album": album, "media_items": media_items,
         "sub_albums": sub_albums, "all_albums": all_albums,
         "zip_job": zip_job, "library_media": library_media,
+        "sub_media": sub_media,
     })
 
 
@@ -142,7 +194,6 @@ async def album_delete(album_id: int, request: Request, db: Session = Depends(ge
     if redir: return redir
     album = db.query(Album).filter(Album.id == album_id).first()
     if album:
-        # Junction rows deleted via CASCADE
         db.query(Album).filter(Album.parent_id == album_id).update({"parent_id": None})
         db.delete(album); db.commit()
     return RedirectResponse("/admin/albums", status_code=302)
@@ -154,11 +205,11 @@ async def album_toggle_public(album_id: int, request: Request, db: Session = Dep
     album = db.query(Album).filter(Album.id == album_id).first()
     if album: album.is_public = not album.is_public; db.commit()
     cls  = "badge-public" if album.is_public else "badge-private"
-    text_label = "PUBLIC" if album.is_public else "PRIVATE"
+    label = "PUBLIC" if album.is_public else "PRIVATE"
     return HTMLResponse(
         f'<span class="badge {cls}" id="visibility-{album_id}" '
         f'hx-post="/admin/albums/{album_id}/toggle-public" '
-        f'hx-trigger="click" hx-swap="outerHTML" style="cursor:pointer;">{text_label}</span>'
+        f'hx-trigger="click" hx-swap="outerHTML" style="cursor:pointer;">{label}</span>'
     )
 
 
@@ -174,11 +225,10 @@ async def album_regen_token(album_id: int, request: Request, db: Session = Depen
     )
 
 
-# ── MANY-TO-MANY: add/remove media via junction ──
+# ── MANY-TO-MANY junction operations ──
 @router.post("/albums/{album_id}/add-media/{media_id}", response_class=HTMLResponse)
 async def album_add_media(album_id: int, media_id: int, request: Request, db: Session = Depends(get_db)):
     if not require_admin(request): return HTMLResponse("", status_code=401)
-    # Check not already linked
     existing = db.execute(
         text("SELECT 1 FROM album_media WHERE album_id=:a AND media_id=:m"),
         {"a": album_id, "m": media_id}
@@ -198,7 +248,6 @@ async def album_add_media_bulk(
     media_ids: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Add multiple media to album at once. media_ids = comma-separated IDs."""
     if not require_admin(request): return HTMLResponse("", status_code=401)
     ids = [int(x) for x in media_ids.split(",") if x.strip().isdigit()]
     for mid in ids:
@@ -234,6 +283,35 @@ async def album_set_cover(album_id: int, media_id: int, request: Request, db: Se
     if album and media and media.thumb_path:
         album.cover_thumb_path = media.thumb_path; db.commit()
     return HTMLResponse('<span style="color:var(--fg);font-size:0.75rem;">✓ Cover set</span>')
+
+
+# ── REORDER ──
+@router.post("/albums/{album_id}/reorder", response_class=JSONResponse)
+async def album_reorder(
+    album_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Receive JSON body: {"order": [media_id, media_id, ...]}
+    Update sort_order in album_media accordingly.
+    """
+    if not require_admin(request):
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    try:
+        body = await request.json()
+        order: list = body.get("order", [])
+    except Exception:
+        return JSONResponse({"status": "error", "message": "Invalid JSON"}, status_code=400)
+
+    for idx, media_id in enumerate(order):
+        db.execute(
+            text("UPDATE album_media SET sort_order = :s WHERE album_id = :a AND media_id = :m"),
+            {"s": idx, "a": album_id, "m": int(media_id)},
+        )
+    db.commit()
+    return JSONResponse({"status": "ok", "updated": len(order)})
 
 
 # ── ZIP ──
