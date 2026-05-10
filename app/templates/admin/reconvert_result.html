@@ -1,0 +1,31 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Reconvert Queue{% endblock %}
+
+{% block content %}
+<div class="admin-page-title">
+  <span>// RECONVERT QUEUE</span>
+  <a href="/admin/cleanup" class="btn btn-sm">← Back</a>
+</div>
+
+<div style="max-width:560px;">
+  <div style="background:rgba(51,255,51,0.06);border:1px solid var(--fg);padding:1rem 1.25rem;margin-bottom:1.5rem;">
+    <div style="font-size:1.2rem;color:var(--fg);letter-spacing:0.06em;margin-bottom:0.4rem;">
+      ✓ {{ queued }} file{% if queued != 1 %}s{% endif %} queued for re-conversion
+    </div>
+    <div style="font-size:0.8rem;color:#333;">
+      Type: {{ 'photos &amp; GIFs' if media_type == 'photo' else 'all media' }}
+    </div>
+  </div>
+
+  <p style="font-size:0.85rem;color:#555;line-height:1.6;">
+    Each file will be re-processed in the background using 2 worker threads.
+    Old WebP versions will be deleted automatically as each file is converted.
+    New files will be saved in the original format (JPEG→JPEG, PNG→PNG, etc.) with EXIF preserved.
+  </p>
+
+  <div style="margin-top:1.25rem;display:flex;gap:0.75rem;flex-wrap:wrap;">
+    <a href="/admin/dashboard" class="btn btn-primary">&gt; Watch Progress on Dashboard</a>
+    <a href="/admin/media"     class="btn">&gt; Media Library</a>
+  </div>
+</div>
+{% endblock %}

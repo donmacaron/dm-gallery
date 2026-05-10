@@ -1,12 +1,14 @@
 """
-Conversion Pipeline — Shared background worker.
-Used by upload.py and folder_import.py.
+Conversion Pipeline — Background worker.
+Deletes old web/thumb files before re-converting so no orphans are left.
 """
 from __future__ import annotations
 
 
 def convert_media_bg(media_id: int, job_id: str) -> None:
     """Background task: convert one media file. Uses its own DB session."""
+    from pathlib import Path
+
     from app.config import get_settings as _gs
     from app.database import SessionLocal
     from app.models.job import Job as _Job
@@ -31,6 +33,16 @@ def convert_media_bg(media_id: int, job_id: str) -> None:
         except Exception:
             pass
 
+    def _delete_old_file(rel_path: str | None) -> None:
+        """Silently delete a file from media_path if it exists."""
+        if not rel_path:
+            return
+        try:
+            p = Path(cfg.media_path) / rel_path
+            p.unlink(missing_ok=True)
+        except Exception:
+            pass
+
     try:
         j = db.query(_Job).filter(_Job.id == job_id).first()
         m = db.query(_Media).filter(_Media.id == media_id).first()
@@ -40,6 +52,11 @@ def convert_media_bg(media_id: int, job_id: str) -> None:
             j.status = "running"
         m.conversion_status = "processing"
         db.commit()
+
+        # Delete previous web / thumb files before re-converting
+        # (covers re-convert scenario where format changes e.g. .webp → .jpg)
+        _delete_old_file(m.web_path)
+        _delete_old_file(m.thumb_path)
 
         if m.media_type == "photo":
             result = process_image(m.original_path, cfg.media_path, m.id)
