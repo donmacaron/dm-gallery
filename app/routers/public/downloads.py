@@ -1,3 +1,4 @@
+from mimetypes import guess_type
 from pathlib import Path
 
 from fastapi import APIRouter, Depends
@@ -17,7 +18,7 @@ settings = get_settings()
 async def download_media(media_id: int, version: str, db: Session = Depends(get_db)):
     """
     Download a media file.
-    version: 'web'      → 2048px WebP
+    version: 'web'      → 2048px derived file
     version: 'original' → original uploaded file
     """
     from fastapi import HTTPException
@@ -29,7 +30,12 @@ async def download_media(media_id: int, version: str, db: Session = Depends(get_
         file_path = Path(settings.media_path) / media.web_path
         if file_path.exists():
             stem = Path(media.original_filename).stem
-            return FileResponse(path=str(file_path), filename=f"{stem}_2k.webp", media_type="image/webp")
+            media_type = guess_type(file_path.name)[0] or "application/octet-stream"
+            return FileResponse(
+                path=str(file_path),
+                filename=f"{stem}_2k{file_path.suffix.lower()}",
+                media_type=media_type,
+            )
 
     elif version == "original" and media.original_path:
         file_path = Path(media.original_path)
