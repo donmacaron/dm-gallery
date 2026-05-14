@@ -3,10 +3,9 @@
 
 {% block extra_css %}
 <style>
-/* ─ Library picker grid (add from library) ────────────────────── */
+/* Library picker */
 .lib-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: 3px; max-height: 380px; overflow-y: auto;
   padding: 4px; background: var(--dim2); border: 1px solid var(--border);
 }
@@ -29,8 +28,6 @@
 .lib-item.sel   .lib-item-check { opacity:1; }
 .lib-item.sel   .lib-item-check { background:var(--accent); color:#000; border-color:var(--accent); }
 .lib-placeholder { width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--border2);font-size:0.65rem; }
-
-/* Sub-album badge on thumbnail */
 .lib-item-badge {
   position:absolute; bottom:0; left:0; right:0;
   background:rgba(0,0,0,0.75); font-size:0.5rem;
@@ -40,7 +37,7 @@
 }
 .lib-item:hover .lib-item-badge { opacity:1; }
 
-/* ─ Sortable media grid ───────────────────────────────── */
+/* Sortable photo grid */
 .sortable-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
@@ -52,36 +49,42 @@
   background: var(--dim2); cursor: grab;
   transition: border-color 0.12s, opacity 0.15s;
 }
-.sort-cell:active { cursor: grabbing; }
+.sort-cell:active          { cursor: grabbing; }
 .sort-cell.sortable-ghost  { opacity: 0.35; border-color: var(--accent); }
 .sort-cell.sortable-chosen { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); z-index: 10; }
-.sort-cell.sortable-drag   { opacity: 0.9; box-shadow: 0 4px 16px rgba(0,0,0,0.6); }
 .sort-cell img { width:100%;height:100%;object-fit:cover;display:block;pointer-events:none; }
 .sort-cell-no-img { width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:#333; }
-
-/* Drag handle indicator */
 .sort-cell::before {
-  content: '☰';
-  position: absolute; top: 4px; left: 4px;
-  font-size: 0.6rem; color: rgba(255,255,255,0.35);
-  pointer-events: none;
+  content:'☰'; position:absolute; top:4px; left:4px;
+  font-size:0.6rem; color:rgba(255,255,255,0.35); pointer-events:none;
 }
-
-/* Action buttons on cell */
 .sort-cell-actions {
   position:absolute; top:0; right:0;
   display:flex; flex-direction:column; gap:2px; padding:2px;
   opacity:0; transition:opacity 0.12s;
 }
 .sort-cell:hover .sort-cell-actions { opacity:1; }
-
-/* Save order indicator */
 #orderSavedMsg {
-  font-size:0.75rem; color:var(--fg);
-  opacity:0; transition:opacity 0.4s;
-  margin-left:0.75rem;
+  font-size:0.75rem; color:var(--fg); opacity:0; transition:opacity 0.4s; margin-left:0.75rem;
 }
 #orderSavedMsg.show { opacity:1; }
+
+/* Sortable sub-albums */
+.sub-sort-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  cursor: grab; background: var(--dim2);
+  transition: background 0.1s;
+}
+.sub-sort-row:active           { cursor: grabbing; }
+.sub-sort-row.sortable-ghost   { opacity: 0.35; }
+.sub-sort-row.sortable-chosen  { background: rgba(255,102,0,0.05); }
+.sub-sort-handle { color:#333; font-size:0.85rem; cursor:grab; user-select:none; flex-shrink:0; }
+.sub-sort-thumb  { width:28px; height:28px; object-fit:cover; border:1px solid var(--border); flex-shrink:0; }
+.sub-sort-thumb-ph { width:28px; height:28px; background:#111; border:1px solid var(--border); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:0.5rem; color:#2a2a2a; }
+#subSavedMsg { font-size:0.72rem; color:var(--fg); opacity:0; transition:opacity 0.3s; margin-left:0.5rem; }
+#subSavedMsg.show { opacity:1; }
 </style>
 {% endblock %}
 
@@ -89,9 +92,7 @@
 <div class="admin-page-title">
   <span>// {{ album.title | upper }}</span>
   <div style="display:flex; gap:0.5rem;">
-    {% if album.is_public %}
-      <a href="/a/{{ album.slug }}" target="_blank" class="btn btn-sm">View ↗</a>
-    {% endif %}
+    {% if album.is_public %}<a href="/a/{{ album.slug }}" target="_blank" class="btn btn-sm">View ↗</a>{% endif %}
     <a href="/admin/albums" class="btn btn-sm">← Albums</a>
   </div>
 </div>
@@ -133,13 +134,11 @@
       </div>
     </form>
 
-    <!-- ZIP -->
     <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border);">
       <div class="section-title"><span>// ZIP ARCHIVE</span></div>
       {% include "admin/_zip_status.html" %}
     </div>
 
-    <!-- Danger -->
     <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border);">
       <form action="/admin/albums/{{ album.id }}/delete" method="post"
             onsubmit="return confirm('Delete album? Media stays in library.')">
@@ -148,7 +147,7 @@
     </div>
   </div>
 
-  <!-- RIGHT: Sharing + Cover from sub-albums -->
+  <!-- RIGHT: Sharing + Sub-albums (sortable) + Cover picker -->
   <div>
     <div class="section-title"><span>// SHARING</span></div>
     <div style="margin-top:0.75rem; margin-bottom:1.25rem;">
@@ -170,18 +169,36 @@
               hx-target="#share-token-{{ album.id }}" hx-swap="outerHTML">↻ Regen</button>
     </div>
 
+    <!-- Sub-albums: sortable list -->
     {% if sub_albums %}
     <div style="margin-top:0.5rem;">
-      <div class="section-title"><span>// SUB-ALBUMS</span></div>
-      {% for sub in sub_albums %}
-      <div style="padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.82rem;">
-        <a href="/admin/albums/{{ sub.id }}" style="color:var(--fg);">{{ sub.title }}</a>
+      <div class="section-title">
+        <span>// SUB-ALBUMS</span>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <span class="sort-saved-msg" id="subSavedMsg">✓ Saved</span>
+          <span style="font-size:0.65rem;color:#2a2a2a;">☰ drag</span>
+        </div>
       </div>
-      {% endfor %}
+      <div id="subAlbumList" style="margin-top:0.4rem;">
+        {% for sub in sub_albums %}
+        <div class="sub-sort-row" data-id="{{ sub.id }}">
+          <span class="sub-sort-handle">☰</span>
+          {% if sub.cover_thumb_path %}
+            <img src="/media/{{ sub.cover_thumb_path }}" class="sub-sort-thumb" alt="">
+          {% else %}
+            <div class="sub-sort-thumb-ph">-</div>
+          {% endif %}
+          <a href="/admin/albums/{{ sub.id }}" style="font-size:0.82rem;color:var(--fg);flex:1;
+             text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ sub.title }}
+          </a>
+        </div>
+        {% endfor %}
+      </div>
     </div>
     {% endif %}
 
-    <!-- COVER FROM SUB-ALBUMS (Task 1) -->
+    <!-- Cover from sub-albums -->
     {% if sub_media %}
     <div style="margin-top:1.25rem;">
       <div class="section-title">
@@ -189,18 +206,15 @@
         <button class="btn btn-sm" onclick="toggleSubCover()">Show / Hide</button>
       </div>
       <div id="subCoverPanel" style="display:none; margin-top:0.5rem;">
-        <div style="font-size:0.72rem;color:#333;margin-bottom:0.5rem;">
-          Click a photo to set it as this album's cover thumbnail.
-        </div>
+        <div style="font-size:0.72rem;color:#333;margin-bottom:0.5rem;">Click a photo to set as cover.</div>
         <div class="lib-grid">
           {% for entry in sub_media %}
           {% set m = entry.media %}
           <div class="lib-item" title="{{ entry.album_name }} — {{ m.original_filename }}"
                hx-post="/admin/albums/{{ album.id }}/set-cover/{{ m.id }}"
-               hx-swap="none"
-               hx-on::after-request="showCoverSet(this)">
+               hx-swap="none" hx-on::after-request="showCoverSet(this)">
             {% if m.thumb_path %}
-              <img src="/media/{{ m.thumb_path }}" loading="lazy" alt="{{ m.original_filename }}">
+              <img src="/media/{{ m.thumb_path }}" loading="lazy">
             {% else %}
               <div class="lib-placeholder">{{ m.media_type[:3]|upper }}</div>
             {% endif %}
@@ -208,15 +222,14 @@
           </div>
           {% endfor %}
         </div>
-        <div id="subCoverMsg" style="font-size:0.72rem;color:var(--fg);margin-top:0.4rem;display:none;">✓ Cover updated. Reload to see it in the header.</div>
+        <div id="subCoverMsg" style="font-size:0.72rem;color:var(--fg);margin-top:0.4rem;display:none;">✓ Cover updated.</div>
       </div>
     </div>
     {% endif %}
-
   </div>
 </div>
 
-<!-- MEDIA IN THIS ALBUM (sortable) -->
+<!-- Media in album (sortable) -->
 <div style="margin-top:2rem;">
   <div class="section-title">
     <span>// IN THIS ALBUM ({{ media_items|length }})</span>
@@ -225,30 +238,25 @@
       <a href="/admin/upload?album_id={{ album.id }}" class="btn btn-sm btn-primary">+ Upload</a>
     </div>
   </div>
-
   {% if media_items %}
-  <p style="font-size:0.7rem;color:#333;margin:-0.5rem 0 0.75rem;letter-spacing:0.06em;">
-    Drag photos to reorder. Changes save automatically.
-  </p>
+  <p style="font-size:0.7rem;color:#333;margin:-0.5rem 0 0.75rem;letter-spacing:0.06em;">Drag to reorder. Saves automatically.</p>
   <div class="sortable-grid" id="sortableGrid">
     {% for item in media_items %}
     <div class="sort-cell" data-id="{{ item.id }}">
       {% if item.thumb_path %}
-        <img src="/media/{{ item.thumb_path }}" loading="lazy" alt="{{ item.original_filename }}">
+        <img src="/media/{{ item.thumb_path }}" loading="lazy">
       {% else %}
         <div class="sort-cell-no-img">{{ item.media_type[:3]|upper }}</div>
       {% endif %}
-
       <div class="sort-cell-actions">
         <button class="btn btn-sm" style="font-size:0.5rem;padding:1px 3px;border-color:#555;"
                 hx-post="/admin/albums/{{ album.id }}/set-cover/{{ item.id }}"
-                hx-swap="none" title="Set as cover">★</button>
+                hx-swap="none" title="Set cover">★</button>
         <button class="btn btn-sm btn-danger" style="font-size:0.5rem;padding:1px 3px;"
                 hx-post="/admin/albums/{{ album.id }}/remove-media/{{ item.id }}"
-                hx-target="#sort-cell-wrap-{{ item.id }}" hx-swap="outerHTML"
-                title="Remove from album">×</button>
+                hx-target="#sort-cell-{{ item.id }}" hx-swap="outerHTML"
+                title="Remove">×</button>
       </div>
-
       {% if item.conversion_status != 'done' %}
       <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.75);padding:1px 3px;">
         <span class="badge badge-{{ item.conversion_status }}" style="font-size:0.5rem;">{{ item.conversion_status|upper }}</span>
@@ -262,7 +270,7 @@
   {% endif %}
 </div>
 
-<!-- ADD FROM LIBRARY -->
+<!-- Add from library -->
 {% if library_media %}
 <div style="margin-top:2rem;">
   <div class="section-title">
@@ -270,14 +278,12 @@
     <button class="btn btn-sm" onclick="toggleLibrary()">Show / Hide</button>
   </div>
   <div id="libraryPanel" style="display:none;margin-top:0.75rem;">
-    <div style="font-size:0.72rem;color:#333;margin-bottom:0.5rem;">
-      Click to select, then &gt; Add Selected.
-    </div>
+    <div style="font-size:0.72rem;color:#333;margin-bottom:0.5rem;">Click to select, then &gt; Add Selected.</div>
     <div class="lib-grid" id="libGrid">
       {% for item in library_media %}
       <div class="lib-item" data-id="{{ item.id }}" onclick="libToggle(this)">
         {% if item.thumb_path %}
-          <img src="/media/{{ item.thumb_path }}" loading="lazy" alt="{{ item.original_filename }}">
+          <img src="/media/{{ item.thumb_path }}" loading="lazy">
         {% else %}
           <div class="lib-placeholder">{{ item.media_type[:3]|upper }}</div>
         {% endif %}
@@ -298,63 +304,70 @@
   </div>
 </div>
 {% endif %}
-
 {% endblock %}
 
 {% block extra_js %}
-<!-- SortableJS from CDN -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
-const ALBUM_ID   = {{ album.id }};
+const ALBUM_ID    = {{ album.id }};
 const REORDER_URL = `/admin/albums/${ALBUM_ID}/reorder`;
+const REORDER_SUBS_URL = `/admin/albums/${ALBUM_ID}/reorder-subs`;
 
-// ── Drag-and-drop reorder (Task 2) ─────────────────────────
+// ─ Sortable photos
 const grid = document.getElementById('sortableGrid');
 if (grid) {
   Sortable.create(grid, {
-    animation:   180,
-    ghostClass:  'sortable-ghost',
-    chosenClass: 'sortable-chosen',
-    dragClass:   'sortable-drag',
-    delay:        50,        // small delay avoids accidental drags on tap
-    delayOnTouchOnly: true,
+    animation: 180, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
+    delay: 50, delayOnTouchOnly: true,
     onEnd: async function() {
-      const cells = grid.querySelectorAll('.sort-cell');
-      const order = Array.from(cells).map(c => parseInt(c.dataset.id));
-      try {
-        const resp = await fetch(REORDER_URL, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ order }),
-        });
-        if (resp.ok) {
-          const msg = document.getElementById('orderSavedMsg');
-          msg.classList.add('show');
-          setTimeout(() => msg.classList.remove('show'), 2000);
-        }
-      } catch(e) {
-        console.error('Reorder failed', e);
+      const order = Array.from(grid.querySelectorAll('.sort-cell')).map(c => parseInt(c.dataset.id));
+      const resp  = await fetch(REORDER_URL, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ order }),
+      });
+      if (resp.ok) {
+        const msg = document.getElementById('orderSavedMsg');
+        msg.classList.add('show'); setTimeout(() => msg.classList.remove('show'), 2000);
       }
     }
   });
 }
 
-// ── Sub-album cover picker (Task 1) ────────────────────────
+// ─ Sortable sub-albums
+const subList = document.getElementById('subAlbumList');
+if (subList) {
+  Sortable.create(subList, {
+    animation: 150, handle: '.sub-sort-handle',
+    ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
+    delay: 50, delayOnTouchOnly: true,
+    onEnd: async function() {
+      const order = Array.from(subList.querySelectorAll('.sub-sort-row')).map(r => parseInt(r.dataset.id));
+      const resp  = await fetch(REORDER_SUBS_URL, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ order }),
+      });
+      if (resp.ok) {
+        const msg = document.getElementById('subSavedMsg');
+        msg.classList.add('show'); setTimeout(() => msg.classList.remove('show'), 2000);
+      }
+    }
+  });
+}
+
+// ─ Cover from sub-albums
 function toggleSubCover() {
   const p = document.getElementById('subCoverPanel');
   p.style.display = p.style.display === 'none' ? '' : 'none';
 }
 function showCoverSet(el) {
-  // Flash the clicked thumbnail
   el.style.borderColor = 'var(--fg)';
   setTimeout(() => el.style.borderColor = '', 1200);
   const msg = document.getElementById('subCoverMsg');
   if (msg) { msg.style.display = ''; setTimeout(() => msg.style.display = 'none', 3000); }
 }
 
-// ── Add-from-library picker ─────────────────────────────
+// ─ Library picker
 let libSelected = new Set();
-
 function toggleLibrary() {
   const p = document.getElementById('libraryPanel');
   p.style.display = p.style.display === 'none' ? '' : 'none';
@@ -374,8 +387,8 @@ function libClearAll() {
   libSelected.clear(); updateLibCount();
 }
 function updateLibCount() {
-  document.getElementById('libCount').textContent   = libSelected.size;
-  document.getElementById('libAddBtn').disabled     = libSelected.size === 0;
+  document.getElementById('libCount').textContent = libSelected.size;
+  document.getElementById('libAddBtn').disabled   = libSelected.size === 0;
 }
 </script>
 {% endblock %}

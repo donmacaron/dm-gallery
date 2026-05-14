@@ -1,79 +1,155 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Albums{% endblock %}
 
+{% block extra_css %}
+<style>
+/* Sortable album rows */
+.album-sort-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--dim2);
+  cursor: grab;
+  transition: background 0.12s;
+}
+.album-sort-row:active           { cursor: grabbing; }
+.album-sort-row.sortable-ghost   { opacity: 0.35; border-color: var(--accent); }
+.album-sort-row.sortable-chosen  { background: rgba(255,102,0,0.05); border-color: var(--accent); }
+
+.album-sort-handle {
+  color: #333; font-size: 0.9rem; cursor: grab;
+  padding: 0 4px; user-select: none; flex-shrink: 0;
+}
+.album-sort-thumb {
+  width: 36px; height: 36px; object-fit: cover;
+  border: 1px solid var(--border); flex-shrink: 0;
+}
+.album-sort-thumb-placeholder {
+  width: 36px; height: 36px; background: #111;
+  border: 1px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem; color: #2a2a2a;
+}
+.album-sort-title {
+  flex: 1; font-size: 0.9rem; color: var(--fg);
+  text-decoration: none; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.album-sort-title:hover { color: var(--accent); }
+
+/* Save indicator */
+.sort-saved-msg {
+  font-size: 0.75rem; color: var(--fg);
+  opacity: 0; transition: opacity 0.3s;
+  margin-left: 0.5rem;
+}
+.sort-saved-msg.show { opacity: 1; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="admin-page-title">
   <span>// ALBUMS</span>
   <a href="/admin/albums/new" class="btn btn-primary">&gt; New Album</a>
 </div>
 
-{% if albums %}
-<table class="admin-table">
-  <thead>
-    <tr>
-      <th>Cover</th>
-      <th>Title</th>
-      <th>Visibility</th>
-      <th>Files</th>
-      <th>ZIP</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for album in albums %}
-    <tr>
-      <td>
-        {% if album.cover_thumb_path %}
-          <img src="/media/{{ album.cover_thumb_path }}" class="admin-thumb">
-        {% else %}
-          <div class="admin-thumb" style="display:flex;align-items:center;justify-content:center;color:#1a1a1a;font-size:0.55rem;">□</div>
-        {% endif %}
-      </td>
+<!-- Top-level albums (draggable) -->
+<div style="margin-bottom:2rem;">
+  <div class="section-title">
+    <span>// TOP-LEVEL ALBUMS</span>
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <span class="sort-saved-msg" id="topSavedMsg">✓ Order saved</span>
+      <span style="font-size:0.7rem;color:#2a2a2a;">☰ drag to reorder</span>
+    </div>
+  </div>
 
-      <td>
-        {% if album.parent_id %}
-          <span style="color:#2a2a2a;">  └ </span>
-        {% endif %}
-        <a href="/admin/albums/{{ album.id }}" style="color:var(--fg);">{{ album.title }}</a>
-        <div style="font-size:0.65rem; color:#2a2a2a; margin-top:0.15rem;">/{{ album.slug }}</div>
-      </td>
+  {% if top_albums %}
+  <div id="topAlbumList" style="margin-top:0.5rem;">
+    {% for album in top_albums %}
+    <div class="album-sort-row" data-id="{{ album.id }}">
+      <span class="album-sort-handle">☰</span>
 
-      <td>
-        <span class="badge {% if album.is_public %}badge-public{% else %}badge-private{% endif %}"
-              id="visibility-{{ album.id }}"
-              hx-post="/admin/albums/{{ album.id }}/toggle-public"
-              hx-trigger="click"
-              hx-swap="outerHTML"
-              style="cursor:pointer;" title="Click to toggle">
-          {% if album.is_public %}PUBLIC{% else %}PRIVATE{% endif %}
-        </span>
-      </td>
+      {% if album.cover_thumb_path %}
+        <img src="/media/{{ album.cover_thumb_path }}" class="album-sort-thumb" alt="">
+      {% else %}
+        <div class="album-sort-thumb-placeholder">NO IMG</div>
+      {% endif %}
 
-      <td style="color:#333;">{{ album.media_items | length }}</td>
+      <a href="/admin/albums/{{ album.id }}" class="album-sort-title">{{ album.title }}</a>
 
-      <td style="font-size:0.72rem; color:#2a2a2a;">
-        {% if album.auto_zip %}✓{% else %}—{% endif %}
-      </td>
+      <span class="badge {% if album.is_public %}badge-public{% else %}badge-private{% endif %}"
+            style="font-size:0.6rem;flex-shrink:0;">
+        {% if album.is_public %}PUB{% else %}PRIV{% endif %}
+      </span>
 
-      <td style="white-space:nowrap;">
-        <a href="/admin/albums/{{ album.id }}" class="btn btn-sm">Edit</a>
-        {% if album.is_public %}
-          <a href="/a/{{ album.slug }}" target="_blank" class="btn btn-sm">View ↗</a>
-        {% elif album.share_token %}
-          <a href="/s/{{ album.share_token }}" target="_blank" class="btn btn-sm">Share ↗</a>
-        {% endif %}
-      </td>
-    </tr>
+      <span style="font-size:0.7rem;color:#2a2a2a;flex-shrink:0;">
+        {{ album.sort_order }}
+      </span>
+    </div>
     {% endfor %}
-  </tbody>
-</table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>[ NO ALBUMS ]</h3>
+    <a href="/admin/albums/new" class="btn btn-primary">&gt; Create First Album</a>
+  </div>
+  {% endif %}
+</div>
 
-{% else %}
-<div class="empty-state">
-  <h3>[ NO ALBUMS ]</h3>
-  <p>Create your first album to start organising your work.</p>
-  <a href="/admin/albums/new" class="btn btn-primary">&gt; New Album</a>
+<!-- Child albums (read-only list with link to parent) -->
+{% if child_albums %}
+<div>
+  <div class="section-title"><span>// SUB-ALBUMS</span></div>
+  <div style="margin-top:0.5rem;">
+    {% for album in child_albums %}
+    <div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0.75rem;
+                border-bottom:1px solid var(--border);font-size:0.82rem;">
+      {% if album.cover_thumb_path %}
+        <img src="/media/{{ album.cover_thumb_path }}" class="album-sort-thumb" alt="">
+      {% else %}
+        <div class="album-sort-thumb-placeholder">NO IMG</div>
+      {% endif %}
+      <span style="color:#2a2a2a;font-size:0.75rem;flex-shrink:0;">└</span>
+      <a href="/admin/albums/{{ album.id }}" style="color:var(--fg);flex:1;">{{ album.title }}</a>
+      <span class="badge {% if album.is_public %}badge-public{% else %}badge-private{% endif %}"
+            style="font-size:0.6rem;">{% if album.is_public %}PUB{% else %}PRIV{% endif %}</span>
+    </div>
+    {% endfor %}
+  </div>
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+const topList = document.getElementById('topAlbumList');
+if (topList) {
+  Sortable.create(topList, {
+    animation:        180,
+    handle:           '.album-sort-handle',
+    ghostClass:       'sortable-ghost',
+    chosenClass:      'sortable-chosen',
+    delay:            50,
+    delayOnTouchOnly: true,
+    onEnd: async function() {
+      const rows  = topList.querySelectorAll('.album-sort-row');
+      const order = Array.from(rows).map(r => parseInt(r.dataset.id));
+      try {
+        const resp = await fetch('/admin/albums/reorder-top', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ order }),
+        });
+        if (resp.ok) {
+          const msg = document.getElementById('topSavedMsg');
+          msg.classList.add('show');
+          setTimeout(() => msg.classList.remove('show'), 2000);
+        }
+      } catch(e) { console.error('Reorder failed', e); }
+    }
+  });
+}
+</script>
 {% endblock %}
