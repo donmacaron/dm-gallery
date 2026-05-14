@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.auth import require_admin
+from app.auth import pwd_context, require_admin
 from app.config import get_settings
 from app.database import get_db
 from app.models.setting import Setting
@@ -49,10 +49,14 @@ async def settings_page(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/admin/login", status_code=302)
     rows    = db.query(Setting).all()
     current = {s.key: s.value for s in rows}
+    # Get current username from DB or fallback to .env
+    current_username = current.get("admin_username") or settings_obj.admin_username
     return templates.TemplateResponse(request, "admin/settings/index.html", {
         "admin": admin, "site_title": settings_obj.site_title,
         "active": "settings", "groups": SETTINGS_GROUPS,
         "current": current, "saved": False,
+        "current_username": current_username,
+        "account_error": None, "account_saved": False,
     })
 
 
@@ -73,8 +77,94 @@ async def settings_update(request: Request, db: Session = Depends(get_db)):
     db.commit()
     rows    = db.query(Setting).all()
     current = {s.key: s.value for s in rows}
+    current_username = current.get("admin_username") or settings_obj.admin_username
     return templates.TemplateResponse(request, "admin/settings/index.html", {
         "admin": admin, "site_title": settings_obj.site_title,
         "active": "settings", "groups": SETTINGS_GROUPS,
         "current": current, "saved": True,
+        "current_username": current_username,
+        "account_error": None, "account_saved": False,
     })
+
+
+@router.post("/settings/update-account", response_class=HTMLResponse)
+async def settings_update_account(request: Request, db: Session = Depends(get_db)):
+    """Change admin username and/or password."""
+    admin = require_admin(request)
+    if not admin:
+        return RedirectResponse("/admin/login", status_code=302)
+
+    form            = await request.form()
+    new_username    = str(form.get("new_username", "")).strip()
+    current_pw      = str(form.get("current_password", ""))
+    new_pw          = str(form.get("new_password", ""))
+    confirm_pw      = str(form.get("confirm_password", ""))
+
+    rows    = db.query(Setting).all()
+    current = {s.key: s.value for s in rows}
+    current_username = current.get("admin_username") or settings_obj.admin_username
+
+    def _render(error=None, saved=False):
+        return templates.TemplateResponse(request, "admin/settings/index.html", {
+            "admin": admin, "site_title": settings_obj.site_title,
+            "active": "settings", "groups": SETTINGS_GROUPS,
+            "current": current, "saved": False,
+            "current_username": current_username,
+            "account_error": error, "account_saved": saved,
+        })
+
+    # Validate current password before allowing any change
+    from app.auth import authenticate_admin
+    if not authenticate_admin(current_username, current_pw):
+        return _render(error="Current password is incorrect.")
+
+    # Validate new password if provided
+    if new_pw:
+        if new_pw != confirm_pw:
+            return _render(error="New passwords do not match.")
+        if len(new_pw) < 6:
+            return _render(error="New password must be at least 6 characters.")
+
+    # Validate new username if provided
+    if new_username and len(new_username) < 2:
+        return _render(error="Username must be at least 2 characters.")
+
+    # Save changes
+    def _upsert(key: str, value: str):
+        row = db.query(Setting).filter(Setting.key == key).first()
+        if row:
+            row.value = value
+        else:
+            db.add(Setting(key=key, value=value))
+
+    if new_username:
+        _upsert("admin_username", new_username)
+        current_username = new_username
+
+    if new_pw:
+        hashed = pwd_context.hash(new_pw)
+        _upsert("admin_password_hash", hashed)
+
+    db.commit()
+
+    # Re-issue cookie with updated username
+    from datetime import timedelta
+    from app.auth import create_access_token
+    token = create_access_token(
+        data={"sub": current_username},
+        expires_delta=timedelta(minutes=settings_obj.access_token_expire_minutes),
+    )
+    rows    = db.query(Setting).all()
+    current = {s.key: s.value for s in rows}
+    resp = templates.TemplateResponse(request, "admin/settings/index.html", {
+        "admin": current_username, "site_title": settings_obj.site_title,
+        "active": "settings", "groups": SETTINGS_GROUPS,
+        "current": current, "saved": False,
+        "current_username": current_username,
+        "account_error": None, "account_saved": True,
+    })
+    resp.set_cookie(
+        key="admin_token", value=token,
+        httponly=True, max_age=60 * 60 * 24 * 7, samesite="lax",
+    )
+    return resp

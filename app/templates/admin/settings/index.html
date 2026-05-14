@@ -5,23 +5,19 @@
 <div class="admin-page-title"><span>// SETTINGS</span></div>
 
 {% if saved %}
-<div style="background:rgba(51,255,51,0.06);border:1px solid var(--fg);color:var(--fg);padding:0.5rem 0.75rem;margin-bottom:1.25rem;font-size:0.85rem;letter-spacing:0.06em;">
-  ✓ Settings saved. Reload the public site to see changes.
-</div>
+<div class="alert-success">✓ Settings saved. Reload the public site to see changes.</div>
 {% endif %}
 
+<!-- Site / Theme / Social settings -->
 <form action="/admin/settings/update" method="post" style="max-width:640px;">
   {% for group_name, fields in groups %}
   <div style="margin-bottom:1.75rem;">
     <div class="section-title" style="margin-bottom:0.85rem;"><span>// {{ group_name | upper }}</span></div>
-
     {% for key, ftype, label in fields %}
     <div class="form-group">
       <label class="form-label" for="{{ key }}">{{ label }}</label>
 
       {% if ftype == 'color' %}
-        {# Color: show picker + hex text input side-by-side.
-           Hidden input with name= is what the form submits. #}
         {% set cur = current.get(key, '') %}
         <div style="display:flex;gap:0.5rem;align-items:center;">
           <input type="color" id="{{ key }}_picker"
@@ -29,18 +25,13 @@
                  style="width:44px;height:36px;border:1px solid var(--border);background:none;cursor:pointer;padding:2px;flex-shrink:0;"
                  oninput="syncColor('{{ key }}', this.value)">
           <input class="form-input" type="text" id="{{ key }}_text"
-                 value="{{ cur }}"
-                 placeholder="#rrggbb or empty"
-                 style="width:140px;"
+                 value="{{ cur }}" placeholder="#rrggbb or empty" style="width:140px;"
                  oninput="syncColor('{{ key }}', this.value)">
           <input type="hidden" name="{{ key }}" id="{{ key }}" value="{{ cur }}">
-          <button type="button" class="btn btn-sm"
-                  onclick="clearColor('{{ key }}')"
-                  title="Clear (inherit from theme)">× clear</button>
+          <button type="button" class="btn btn-sm" onclick="clearColor('{{ key }}')"
+                  title="Clear — inherit from theme">× clear</button>
         </div>
-        <div style="font-size:0.62rem;color:#333;margin-top:0.25rem;letter-spacing:0.06em;">
-          Leave empty to inherit the page background / text color
-        </div>
+        <div style="font-size:0.62rem;color:#333;margin-top:0.25rem;">Leave empty to inherit theme default</div>
 
       {% elif ftype == 'checkbox' %}
         <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;margin-top:0.2rem;">
@@ -59,9 +50,56 @@
     {% endfor %}
   </div>
   {% endfor %}
-
   <button type="submit" class="btn btn-primary">&gt; Save All Settings</button>
 </form>
+
+<!-- Admin Account -->
+<div style="max-width:640px; margin-top:2.5rem; padding-top:1.5rem; border-top:2px solid var(--border);">
+  <div class="section-title" style="margin-bottom:0.85rem;"><span>// ADMIN ACCOUNT</span></div>
+
+  {% if account_saved %}
+  <div class="alert-success">✓ Account updated. You are still logged in.</div>
+  {% endif %}
+  {% if account_error %}
+  <div class="login-error" style="margin-bottom:1rem;">! {{ account_error }}</div>
+  {% endif %}
+
+  <form action="/admin/settings/update-account" method="post">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <div class="form-group">
+        <label class="form-label">Current Username</label>
+        <input class="form-input" type="text" value="{{ current_username }}" disabled
+               style="opacity:0.5; cursor:not-allowed;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Username <span style="color:#555;font-size:0.75rem;">(leave empty to keep)</span></label>
+        <input class="form-input" type="text" name="new_username"
+               placeholder="new username" autocomplete="username">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
+      <div class="form-group">
+        <label class="form-label">Current Password <span style="color:#ff4444;font-size:0.75rem;">*</span></label>
+        <input class="form-input" type="password" name="current_password"
+               placeholder="required to save" autocomplete="current-password" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Password <span style="color:#555;font-size:0.75rem;">(leave empty to keep)</span></label>
+        <input class="form-input" type="password" name="new_password"
+               placeholder="min 6 chars" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm New Password</label>
+        <input class="form-input" type="password" name="confirm_password"
+               placeholder="repeat new password" autocomplete="new-password">
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">&gt; Update Account</button>
+  </form>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -71,14 +109,12 @@ function syncColor(key, val) {
   const picker = document.getElementById(key + '_picker');
   const text   = document.getElementById(key + '_text');
   if (hidden) hidden.value = val;
-  // Only update picker if looks like a valid hex
   if (picker && /^#[0-9a-fA-F]{6}$/.test(val)) picker.value = val;
   if (text && document.activeElement !== text) text.value = val;
 }
 function clearColor(key) {
-  document.getElementById(key).value          = '';
-  document.getElementById(key + '_text').value = '';
-  // Reset picker to black (visual only)
+  document.getElementById(key).value           = '';
+  document.getElementById(key + '_text').value  = '';
   const p = document.getElementById(key + '_picker');
   if (p) p.value = '#000000';
 }
