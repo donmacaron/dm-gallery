@@ -1,8 +1,34 @@
 """
 Conversion Pipeline — Background worker.
-Deletes old web/thumb files before re-converting so no orphans are left.
+Deletes old web/thumb files before re-converting.
+Auto-sets album cover if album has no cover yet.
 """
 from __future__ import annotations
+
+
+def _try_auto_cover(db, media_id: int, thumb_path: str) -> None:
+    """
+    If the converted media belongs to one or more albums that have no
+    cover_thumb_path yet, set this thumbnail as their cover automatically.
+    """
+    try:
+        from sqlalchemy import text
+        from app.models.album import Album
+
+        # Find all albums this media belongs to
+        rows = db.execute(
+            text("SELECT album_id FROM album_media WHERE media_id = :mid"),
+            {"mid": media_id},
+        ).fetchall()
+
+        for row in rows:
+            album = db.query(Album).filter(Album.id == row[0]).first()
+            if album and not album.cover_thumb_path:
+                album.cover_thumb_path = thumb_path
+
+        db.commit()
+    except Exception:
+        pass  # Auto-cover is best-effort; never break the main pipeline
 
 
 def convert_media_bg(media_id: int, job_id: str) -> None:
@@ -34,12 +60,10 @@ def convert_media_bg(media_id: int, job_id: str) -> None:
             pass
 
     def _delete_old_file(rel_path: str | None) -> None:
-        """Silently delete a file from media_path if it exists."""
         if not rel_path:
             return
         try:
-            p = Path(cfg.media_path) / rel_path
-            p.unlink(missing_ok=True)
+            Path(cfg.media_path, rel_path).unlink(missing_ok=True)
         except Exception:
             pass
 
@@ -53,8 +77,7 @@ def convert_media_bg(media_id: int, job_id: str) -> None:
         m.conversion_status = "processing"
         db.commit()
 
-        # Delete previous web / thumb files before re-converting
-        # (covers re-convert scenario where format changes e.g. .webp → .jpg)
+        # Delete old web/thumb files (handles format change e.g. .webp → .jpg)
         _delete_old_file(m.web_path)
         _delete_old_file(m.thumb_path)
 
@@ -87,6 +110,10 @@ def convert_media_bg(media_id: int, job_id: str) -> None:
             j.done_items = 1
 
         db.commit()
+
+        # Auto-set album cover if this album has none yet
+        if m.thumb_path:
+            _try_auto_cover(db, media_id, m.thumb_path)
 
     except Exception as exc:
         db.rollback()

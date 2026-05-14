@@ -1,6 +1,6 @@
 from __future__ import annotations
 import secrets
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -29,7 +29,6 @@ def _guard(request: Request):
 
 
 def _album_media(db: Session, album_id: int) -> list:
-    """Media linked to album via junction table, ordered by sort_order."""
     rows = db.execute(
         text("SELECT media_id FROM album_media WHERE album_id = :aid ORDER BY sort_order, added_at"),
         {"aid": album_id},
@@ -43,7 +42,6 @@ def _album_media(db: Session, album_id: int) -> list:
 
 
 def _get_sub_album_ids(db: Session, album_id: int) -> list:
-    """Recursively collect all descendant album IDs."""
     result = []
     queue = [album_id]
     while queue:
@@ -53,21 +51,17 @@ def _get_sub_album_ids(db: Session, album_id: int) -> list:
             {"pid": current}
         ).fetchall()
         for row in children:
-            cid = row[0]
-            result.append(cid)
-            queue.append(cid)
+            result.append(row[0])
+            queue.append(row[0])
     return result
 
 
 def _sub_album_media(db: Session, album_id: int) -> list:
-    """All converted photos from all nested sub-albums (recursive)."""
     sub_ids = _get_sub_album_ids(db, album_id)
     if not sub_ids:
         return []
-    # Build sub-album name map
-    sub_albums = db.query(Album).filter(Album.id.in_(sub_ids)).all()
+    sub_albums     = db.query(Album).filter(Album.id.in_(sub_ids)).all()
     album_name_map = {a.id: a.title for a in sub_albums}
-
     result = []
     for sub_id in sub_ids:
         rows = db.execute(
@@ -83,12 +77,34 @@ def _sub_album_media(db: Session, album_id: int) -> list:
             Media.thumb_path.isnot(None),
         ).all()
         for m in objs:
-            result.append({
-                "media":      m,
-                "album_id":   sub_id,
-                "album_name": album_name_map.get(sub_id, ""),
-            })
+            result.append({"media": m, "album_id": sub_id, "album_name": album_name_map.get(sub_id, "")})
     return result
+
+
+def _try_auto_cover(db: Session, album_id: int) -> None:
+    """
+    If the album has no cover yet, pick the first linked media with a thumbnail.
+    Called after any media is added to an album.
+    """
+    album = db.query(Album).filter(Album.id == album_id).first()
+    if not album or album.cover_thumb_path:
+        return
+    # Find first media in this album that has a thumb
+    row = db.execute(
+        text("""
+            SELECT m.thumb_path FROM media m
+            JOIN album_media am ON am.media_id = m.id
+            WHERE am.album_id = :aid
+              AND m.thumb_path IS NOT NULL
+              AND m.conversion_status = 'done'
+            ORDER BY am.sort_order, am.added_at
+            LIMIT 1
+        """),
+        {"aid": album_id},
+    ).fetchone()
+    if row and row[0]:
+        album.cover_thumb_path = row[0]
+        db.commit()
 
 
 # ── LIST ──
@@ -141,7 +157,6 @@ async def album_detail(album_id: int, request: Request, db: Session = Depends(ge
     if redir: return redir
     album = db.query(Album).filter(Album.id == album_id).first()
     if not album: return RedirectResponse("/admin/albums", status_code=302)
-
     media_items   = _album_media(db, album_id)
     sub_albums    = db.query(Album).filter(Album.parent_id == album_id).order_by(Album.sort_order).all()
     all_albums    = db.query(Album).filter(Album.id != album_id).order_by(Album.title).all()
@@ -154,18 +169,14 @@ async def album_detail(album_id: int, request: Request, db: Session = Depends(ge
         db.query(Media)
         .filter(Media.conversion_status == "done")
         .filter(~Media.id.in_(linked_ids) if linked_ids else True)
-        .order_by(Media.created_at.desc())
-        .all()
+        .order_by(Media.created_at.desc()).all()
     )
-    # Photos from sub-albums (for cover picker on parent albums)
     sub_media = _sub_album_media(db, album_id)
-
     return templates.TemplateResponse(request, "admin/albums/edit.html", {
         "admin": admin, "site_title": settings.site_title, "active": "albums",
         "album": album, "media_items": media_items,
         "sub_albums": sub_albums, "all_albums": all_albums,
-        "zip_job": zip_job, "library_media": library_media,
-        "sub_media": sub_media,
+        "zip_job": zip_job, "library_media": library_media, "sub_media": sub_media,
     })
 
 
@@ -181,9 +192,11 @@ async def album_update(
     if redir: return redir
     album = db.query(Album).filter(Album.id == album_id).first()
     if not album: return RedirectResponse("/admin/albums", status_code=302)
-    album.title = title.strip(); album.description = description.strip() or None
-    album.parent_id = int(parent_id) if parent_id and parent_id.isdigit() else None
-    album.is_public = is_public == "on"; album.auto_zip = auto_zip == "on"
+    album.title       = title.strip()
+    album.description = description.strip() or None
+    album.parent_id   = int(parent_id) if parent_id and parent_id.isdigit() else None
+    album.is_public   = is_public == "on"
+    album.auto_zip    = auto_zip == "on"
     db.commit()
     return RedirectResponse(f"/admin/albums/{album_id}", status_code=302)
 
@@ -204,7 +217,7 @@ async def album_toggle_public(album_id: int, request: Request, db: Session = Dep
     if not require_admin(request): return HTMLResponse("", status_code=401)
     album = db.query(Album).filter(Album.id == album_id).first()
     if album: album.is_public = not album.is_public; db.commit()
-    cls  = "badge-public" if album.is_public else "badge-private"
+    cls   = "badge-public" if album.is_public else "badge-private"
     label = "PUBLIC" if album.is_public else "PRIVATE"
     return HTMLResponse(
         f'<span class="badge {cls}" id="visibility-{album_id}" '
@@ -225,7 +238,7 @@ async def album_regen_token(album_id: int, request: Request, db: Session = Depen
     )
 
 
-# ── MANY-TO-MANY junction operations ──
+# ── MANY-TO-MANY ──
 @router.post("/albums/{album_id}/add-media/{media_id}", response_class=HTMLResponse)
 async def album_add_media(album_id: int, media_id: int, request: Request, db: Session = Depends(get_db)):
     if not require_admin(request): return HTMLResponse("", status_code=401)
@@ -239,6 +252,7 @@ async def album_add_media(album_id: int, media_id: int, request: Request, db: Se
             {"a": album_id, "m": media_id}
         )
         db.commit()
+        _try_auto_cover(db, album_id)
     return HTMLResponse("")
 
 
@@ -261,6 +275,7 @@ async def album_add_media_bulk(
                 {"a": album_id, "m": mid}
             )
     db.commit()
+    _try_auto_cover(db, album_id)
     return RedirectResponse(f"/admin/albums/{album_id}", status_code=302)
 
 
@@ -287,24 +302,14 @@ async def album_set_cover(album_id: int, media_id: int, request: Request, db: Se
 
 # ── REORDER ──
 @router.post("/albums/{album_id}/reorder", response_class=JSONResponse)
-async def album_reorder(
-    album_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """
-    Receive JSON body: {"order": [media_id, media_id, ...]}
-    Update sort_order in album_media accordingly.
-    """
+async def album_reorder(album_id: int, request: Request, db: Session = Depends(get_db)):
     if not require_admin(request):
-        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
-
+        return JSONResponse({"status": "error"}, status_code=401)
     try:
-        body = await request.json()
-        order: list = body.get("order", [])
+        body  = await request.json()
+        order = body.get("order", [])
     except Exception:
         return JSONResponse({"status": "error", "message": "Invalid JSON"}, status_code=400)
-
     for idx, media_id in enumerate(order):
         db.execute(
             text("UPDATE album_media SET sort_order = :s WHERE album_id = :a AND media_id = :m"),
