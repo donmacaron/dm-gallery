@@ -25,6 +25,9 @@ SETTINGS_GROUPS = [
         ("header_border_color", "color",    "Header Border / Divider Color"),
         ("header_text_color",   "color",    "Header Text / Logo Color"),
     ]),
+    ("Gallery Display", [
+        ("album_names_always", "checkbox", "Always show album names (unchecked = hover only)"),
+    ]),
     ("Social Links", [
         ("social_telegram_url",  "url", "Telegram URL (empty = hide icon)"),
         ("social_instagram_url", "url", "Instagram URL (empty = hide icon)"),
@@ -105,8 +108,8 @@ async def settings_update_account(request: Request, db: Session = Depends(get_db
     new_pw       = str(form.get("new_password", ""))
     confirm_pw   = str(form.get("confirm_password", ""))
 
-    rows    = db.query(Setting).all()
-    current = {s.key: s.value for s in rows}
+    rows         = db.query(Setting).all()
+    current      = {s.key: s.value for s in rows}
     cur_username = _current_username(db)
 
     def _render(error=None, saved=False):
@@ -118,26 +121,21 @@ async def settings_update_account(request: Request, db: Session = Depends(get_db
             "account_error": error, "account_saved": saved,
         })
 
-    # Must verify current password first
     if not authenticate_admin(cur_username, current_pw):
         return _render(error="Current password is incorrect.")
-
     if new_pw:
         if new_pw != confirm_pw:
             return _render(error="New passwords do not match.")
         if len(new_pw) < 6:
             return _render(error="New password must be at least 6 characters.")
-
     if new_username and len(new_username) < 2:
         return _render(error="Username must be at least 2 characters.")
 
     if new_username:
         _upsert(db, "admin_username", new_username)
         cur_username = new_username
-
     if new_pw:
         _upsert(db, "admin_password_hash", hash_password(new_pw))
-
     db.commit()
 
     from datetime import timedelta

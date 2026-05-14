@@ -27,6 +27,7 @@ def get_site_ctx(db: Session) -> dict:
     ctx.setdefault("header_bg_color",        "")
     ctx.setdefault("header_border_color",    "")
     ctx.setdefault("header_text_color",      "")
+    ctx.setdefault("album_names_always",     "0")
     ctx.setdefault("theme_bg_color",         "#0a0a0a")
     ctx.setdefault("theme_fg_color",         "#33ff33")
     ctx.setdefault("theme_accent_color",     "#ff6600")
@@ -64,7 +65,6 @@ def get_menu(db: Session) -> list:
 
 
 def get_album_media(db: Session, album_id: int) -> list:
-    """Get media for an album via junction table, ordered by sort_order."""
     rows = db.execute(
         text("""
             SELECT m.* FROM media m
@@ -75,12 +75,10 @@ def get_album_media(db: Session, album_id: int) -> list:
         """),
         {"album_id": album_id},
     ).mappings().all()
-    # Convert to Media ORM objects via primary key lookup (cached in session)
     media_ids = [r["id"] for r in rows]
     if not media_ids:
         return []
     objs = db.query(Media).filter(Media.id.in_(media_ids)).all()
-    # Re-sort to match junction order
     order_map = {mid: i for i, mid in enumerate(media_ids)}
     return sorted(objs, key=lambda m: order_map.get(m.id, 9999))
 
