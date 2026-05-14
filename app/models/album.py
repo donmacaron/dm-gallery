@@ -13,6 +13,7 @@ class Album(Base):
     description      = Column(Text, nullable=True)
     parent_id        = Column(Integer, nullable=True, index=True)
     cover_thumb_path = Column(String, nullable=True)
+    dominant_color   = Column(String(7), nullable=True)  # hex e.g. #a3c4f1
     is_public        = Column(Boolean, default=False, index=True)
     share_token      = Column(String, unique=True, nullable=True, index=True)
     sort_order       = Column(Integer, default=0)
@@ -20,7 +21,6 @@ class Album(Base):
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
     updated_at       = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Many-to-many: one photo can appear in many albums
     media_items = relationship(
         "Media",
         secondary="album_media",
@@ -28,7 +28,3 @@ class Album(Base):
         lazy="select",
     )
     menu_items = relationship("MenuItem", back_populates="album")
-
-    @property
-    def media_count(self) -> int:
-        return len(self.media_items) if self.media_items else 0

@@ -9,10 +9,10 @@
   <a href="/">HOME</a>
   {% for crumb in breadcrumb %}
     <span class="breadcrumb-sep">/</span>
-    <a href="/a/{{ crumb.slug }}">{{ crumb.title | upper }}</a>
+    <a href="/a/{{ crumb.slug }}">{{ crumb.title|upper }}</a>
   {% endfor %}
   <span class="breadcrumb-sep">/</span>
-  <span>{{ album.title | upper }}</span>
+  <span>{{ album.title|upper }}</span>
 </div>
 
 <!-- Album header -->
@@ -22,8 +22,8 @@
     <div class="album-desc">{{ album.description }}</div>
   {% endif %}
   <div class="album-meta">
-    <span>{{ media_items | length }} file{% if media_items | length != 1 %}s{% endif %}</span>
-    {% if sub_albums %}<span>{{ sub_albums | length }} sub-album{% if sub_albums | length != 1 %}s{% endif %}</span>{% endif %}
+    <span>{{ media_items|length }} file{% if media_items|length != 1 %}s{% endif %}</span>
+    {% if sub_albums %}<span>{{ sub_albums|length }} sub-album{% if sub_albums|length != 1 %}s{% endif %}</span>{% endif %}
     {% if is_shared | default(false) %}<span style="color:var(--accent);">□ CLIENT VIEW</span>{% endif %}
   </div>
 </div>
@@ -40,12 +40,11 @@
       {% else %}
         <div class="album-card-no-cover">
           <span class="album-icon">□</span>
-          <span style="font-size:0.75rem;">{{ sub.title | upper }}</span>
         </div>
       {% endif %}
-      <div class="album-card-overlay">
+      <div class="album-card-overlay"
+           {% if sub.dominant_color %}style="--album-title-color:{{ sub.dominant_color }};"{% endif %}>
         <div class="album-card-title">{{ sub.title }}</div>
-        <div class="album-card-count">{{ sub.media_items | length }} files</div>
       </div>
     </a>
     {% endfor %}
@@ -55,21 +54,17 @@
 
 <!-- Media grid -->
 {% if media_items %}
-<div class="section-title">
-  <span>// PHOTOS</span><span>{{ media_items | length }}</span>
+<div class="section-title" style="margin-bottom:1rem;">
+  <span>// PHOTOS</span><span>{{ media_items|length }}</span>
 </div>
 
 <div class="media-grid" id="mediaGrid">
   {% for item in media_items %}
-  <div class="media-thumb lazy-item"
-       data-index="{{ loop.index0 }}"
-       onclick="openLightbox({{ loop.index0 }})">
+  <div class="media-thumb lazy-item" data-index="{{ loop.index0 }}" onclick="openLightbox({{ loop.index0 }})">
     {% if item.thumb_path %}
-      <img src="/media/{{ item.thumb_path }}"
-           alt="{{ item.original_filename }}"
-           loading="lazy">
+      <img src="/media/{{ item.thumb_path }}" alt="{{ item.original_filename }}" loading="lazy">
     {% else %}
-      <div class="media-thumb-placeholder">{{ item.media_type | upper }}</div>
+      <div class="media-thumb-placeholder">{{ item.media_type|upper }}</div>
     {% endif %}
   </div>
   {% endfor %}
@@ -78,9 +73,7 @@
 {% include "public/_lightbox.html" %}
 
 {% else %}
-<div style="padding:3rem; text-align:center; color:#333; letter-spacing:0.1em;">
-  [ NO PHOTOS IN THIS ALBUM ]
-</div>
+<div style="padding:3rem;text-align:center;color:#333;letter-spacing:0.1em;">[ NO PHOTOS IN THIS ALBUM ]</div>
 {% endif %}
 
 {% endblock %}
@@ -89,11 +82,9 @@
 <script>
 const MEDIA = [
   {% for item in media_items %}
-  { id: {{ item.id }},
-    webPath:  "{{ item.web_path or '' }}",
-    name:     "{{ item.original_filename | replace('"', '') }}",
-    w:        {{ item.width or 0 }},
-    h:        {{ item.height or 0 }} },
+  { id:{{ item.id }}, webPath:"{{ item.web_path or '' }}",
+    name:"{{ item.original_filename|replace('"','') }}",
+    w:{{ item.width or 0 }}, h:{{ item.height or 0 }} },
   {% endfor %}
 ];
 </script>

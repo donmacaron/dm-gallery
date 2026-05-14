@@ -82,6 +82,7 @@ def _sub_album_media(db: Session, album_id: int) -> list:
 
 
 def _try_auto_cover(db: Session, album_id: int) -> None:
+    """Set first available thumb as cover if album has none. Also extracts dominant color."""
     album = db.query(Album).filter(Album.id == album_id).first()
     if not album or album.cover_thumb_path:
         return
@@ -99,27 +100,33 @@ def _try_auto_cover(db: Session, album_id: int) -> None:
     ).fetchone()
     if row and row[0]:
         album.cover_thumb_path = row[0]
+        _update_dominant_color(album, row[0])
         db.commit()
 
 
-# ── LIST (top-level, sortable) ──
+def _update_dominant_color(album: Album, thumb_path: str) -> None:
+    """Extract dominant color from thumbnail and store on album (no commit)."""
+    try:
+        from app.services.color_extractor import extract_dominant_color
+        color = extract_dominant_color(thumb_path, settings.media_path)
+        if color:
+            album.dominant_color = color
+    except Exception:
+        pass
+
+
+# ── LIST ──
 @router.get("/albums", response_class=HTMLResponse)
 async def albums_list(request: Request, db: Session = Depends(get_db)):
     admin, redir = _guard(request)
     if redir: return redir
-    # Top-level albums ordered by sort_order
     top_albums = (
-        db.query(Album)
-        .filter(Album.parent_id == None)
-        .order_by(Album.sort_order, Album.title)
-        .all()
+        db.query(Album).filter(Album.parent_id == None)
+        .order_by(Album.sort_order, Album.title).all()
     )
-    # All other albums (have a parent)
     child_albums = (
-        db.query(Album)
-        .filter(Album.parent_id != None)
-        .order_by(Album.parent_id, Album.sort_order, Album.title)
-        .all()
+        db.query(Album).filter(Album.parent_id != None)
+        .order_by(Album.parent_id, Album.sort_order, Album.title).all()
     )
     return templates.TemplateResponse(request, "admin/albums/list.html", {
         "admin": admin, "site_title": settings.site_title, "active": "albums",
@@ -127,32 +134,23 @@ async def albums_list(request: Request, db: Session = Depends(get_db)):
     })
 
 
-# ── REORDER TOP-LEVEL ALBUMS ──
 @router.post("/albums/reorder-top", response_class=JSONResponse)
 async def albums_reorder_top(request: Request, db: Session = Depends(get_db)):
-    """Reorder top-level albums. Receives JSON: {order: [album_id, ...]}"""
-    if not require_admin(request):
-        return JSONResponse({"status": "error"}, status_code=401)
+    if not require_admin(request): return JSONResponse({"status": "error"}, status_code=401)
     try:
         body  = await request.json()
         order = body.get("order", [])
     except Exception:
         return JSONResponse({"status": "error"}, status_code=400)
     for idx, album_id in enumerate(order):
-        db.execute(
-            text("UPDATE albums SET sort_order = :s WHERE id = :id"),
-            {"s": idx, "id": int(album_id)},
-        )
+        db.execute(text("UPDATE albums SET sort_order = :s WHERE id = :id"), {"s": idx, "id": int(album_id)})
     db.commit()
     return JSONResponse({"status": "ok", "updated": len(order)})
 
 
-# ── REORDER SUB-ALBUMS ──
 @router.post("/albums/{album_id}/reorder-subs", response_class=JSONResponse)
 async def album_reorder_subs(album_id: int, request: Request, db: Session = Depends(get_db)):
-    """Reorder sub-albums of a parent. Receives JSON: {order: [album_id, ...]}"""
-    if not require_admin(request):
-        return JSONResponse({"status": "error"}, status_code=401)
+    if not require_admin(request): return JSONResponse({"status": "error"}, status_code=401)
     try:
         body  = await request.json()
         order = body.get("order", [])
@@ -161,7 +159,7 @@ async def album_reorder_subs(album_id: int, request: Request, db: Session = Depe
     for idx, aid in enumerate(order):
         db.execute(
             text("UPDATE albums SET sort_order = :s WHERE id = :id AND parent_id = :pid"),
-            {"s": idx, "id": int(aid), "pid": album_id},
+            {"s": idx, "id": int(aid), "pid": album_id}
         )
     db.commit()
     return JSONResponse({"status": "ok", "updated": len(order)})
@@ -215,8 +213,7 @@ async def album_detail(album_id: int, request: Request, db: Session = Depends(ge
     )
     linked_ids    = [m.id for m in media_items]
     library_media = (
-        db.query(Media)
-        .filter(Media.conversion_status == "done")
+        db.query(Media).filter(Media.conversion_status == "done")
         .filter(~Media.id.in_(linked_ids) if linked_ids else True)
         .order_by(Media.created_at.desc()).all()
     )
@@ -241,11 +238,9 @@ async def album_update(
     if redir: return redir
     album = db.query(Album).filter(Album.id == album_id).first()
     if not album: return RedirectResponse("/admin/albums", status_code=302)
-    album.title       = title.strip()
-    album.description = description.strip() or None
-    album.parent_id   = int(parent_id) if parent_id and parent_id.isdigit() else None
-    album.is_public   = is_public == "on"
-    album.auto_zip    = auto_zip == "on"
+    album.title = title.strip(); album.description = description.strip() or None
+    album.parent_id = int(parent_id) if parent_id and parent_id.isdigit() else None
+    album.is_public = is_public == "on"; album.auto_zip = auto_zip == "on"
     db.commit()
     return RedirectResponse(f"/admin/albums/{album_id}", status_code=302)
 
@@ -341,24 +336,25 @@ async def album_remove_media(album_id: int, media_id: int, request: Request, db:
 
 @router.post("/albums/{album_id}/set-cover/{media_id}", response_class=HTMLResponse)
 async def album_set_cover(album_id: int, media_id: int, request: Request, db: Session = Depends(get_db)):
+    """Set cover + extract dominant color."""
     if not require_admin(request): return HTMLResponse("", status_code=401)
     album = db.query(Album).filter(Album.id == album_id).first()
     media = db.query(Media).filter(Media.id == media_id).first()
     if album and media and media.thumb_path:
-        album.cover_thumb_path = media.thumb_path; db.commit()
+        album.cover_thumb_path = media.thumb_path
+        _update_dominant_color(album, media.thumb_path)
+        db.commit()
     return HTMLResponse('<span style="color:var(--fg);font-size:0.75rem;">✓ Cover set</span>')
 
 
-# ── REORDER PHOTOS IN ALBUM ──
 @router.post("/albums/{album_id}/reorder", response_class=JSONResponse)
 async def album_reorder(album_id: int, request: Request, db: Session = Depends(get_db)):
-    if not require_admin(request):
-        return JSONResponse({"status": "error"}, status_code=401)
+    if not require_admin(request): return JSONResponse({"status": "error"}, status_code=401)
     try:
         body  = await request.json()
         order = body.get("order", [])
     except Exception:
-        return JSONResponse({"status": "error", "message": "Invalid JSON"}, status_code=400)
+        return JSONResponse({"status": "error"}, status_code=400)
     for idx, media_id in enumerate(order):
         db.execute(
             text("UPDATE album_media SET sort_order = :s WHERE album_id = :a AND media_id = :m"),
