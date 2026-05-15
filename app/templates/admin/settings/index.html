@@ -1,14 +1,71 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Settings{% endblock %}
 
+{% block extra_css %}
+<style>
+/* Album picker for selected_albums mode */
+.album-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 3px; max-height: 280px; overflow-y: auto;
+  padding: 4px; background: var(--dim2); border: 1px solid var(--border);
+  margin-top: 0.5rem;
+}
+.ap-item {
+  position: relative; aspect-ratio: 1;
+  overflow: hidden; border: 2px solid transparent;
+  cursor: pointer; background: #111; transition: border-color 0.1s;
+}
+.ap-item:hover   { border-color: var(--border2); }
+.ap-item.ap-sel  { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.ap-item img     { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+.ap-item-label {
+  position:absolute; bottom:0; left:0; right:0;
+  background:rgba(0,0,0,0.78); font-size:0.55rem;
+  padding:2px 4px; color:#ccc; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; text-align:center;
+}
+.ap-check {
+  position:absolute; top:3px; left:3px; width:16px; height:16px;
+  background:rgba(0,0,0,0.75); border:1px solid #555;
+  display:flex; align-items:center; justify-content:center;
+  font-size:0.65rem; color:var(--accent);
+  opacity:0; pointer-events:none; transition:opacity 0.1s;
+}
+.ap-item:hover .ap-check,
+.ap-item.ap-sel  .ap-check { opacity:1; }
+.ap-item.ap-sel  .ap-check { background:var(--accent); color:#000; }
+
+/* Photo picker for specific_photo mode */
+.photo-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 3px; max-height: 240px; overflow-y: auto;
+  padding: 4px; background: var(--dim2); border: 1px solid var(--border);
+  margin-top: 0.5rem;
+}
+.pp-item {
+  aspect-ratio: 1; overflow: hidden;
+  border: 2px solid transparent; cursor: pointer; background: #111;
+  transition: border-color 0.1s;
+}
+.pp-item:hover   { border-color: var(--border2); }
+.pp-item.pp-sel  { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.pp-item img     { width:100%; height:100%; object-fit:cover; display:block; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="admin-page-title"><span>// SETTINGS</span></div>
 
 {% if saved %}
 <div class="alert-success">✓ Settings saved. Reload the public site to see changes.</div>
 {% endif %}
+{% if homepage_saved | default(false) %}
+<div class="alert-success">✓ Homepage settings saved.</div>
+{% endif %}
 
-<!-- Site / Theme / Social settings -->
+<!-- ===== Site / Header / Theme / Social ===== -->
 <form action="/admin/settings/update" method="post" style="max-width:640px;">
   {% for group_name, fields in groups %}
   <div style="margin-bottom:1.75rem;">
@@ -16,30 +73,26 @@
     {% for key, ftype, label in fields %}
     <div class="form-group">
       <label class="form-label" for="{{ key }}">{{ label }}</label>
-
       {% if ftype == 'color' %}
         {% set cur = current.get(key, '') %}
         <div style="display:flex;gap:0.5rem;align-items:center;">
-          <input type="color" id="{{ key }}_picker"
-                 value="{{ cur if cur else '#000000' }}"
+          <input type="color" id="{{ key }}_picker" value="{{ cur if cur else '#000000' }}"
                  style="width:44px;height:36px;border:1px solid var(--border);background:none;cursor:pointer;padding:2px;flex-shrink:0;"
                  oninput="syncColor('{{ key }}', this.value)">
-          <input class="form-input" type="text" id="{{ key }}_text"
-                 value="{{ cur }}" placeholder="#rrggbb or empty" style="width:140px;"
+          <input class="form-input" type="text" id="{{ key }}_text" value="{{ cur }}"
+                 placeholder="#rrggbb or empty" style="width:140px;"
                  oninput="syncColor('{{ key }}', this.value)">
           <input type="hidden" name="{{ key }}" id="{{ key }}" value="{{ cur }}">
           <button type="button" class="btn btn-sm" onclick="clearColor('{{ key }}')"
-                  title="Clear — inherit from theme">× clear</button>
+                  title="Inherit from theme">× clear</button>
         </div>
         <div style="font-size:0.62rem;color:#333;margin-top:0.25rem;">Leave empty to inherit theme default</div>
-
       {% elif ftype == 'checkbox' %}
         <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;margin-top:0.2rem;">
           <input type="checkbox" id="{{ key }}" name="{{ key }}" value="1"
                  {% if current.get(key, '0') == '1' %}checked{% endif %}>
           <span style="font-size:0.85rem;color:#666;">Enabled</span>
         </label>
-
       {% else %}
         <input class="form-input" type="{{ ftype }}" id="{{ key }}" name="{{ key }}"
                value="{{ current.get(key, '') }}"
@@ -50,73 +103,236 @@
     {% endfor %}
   </div>
   {% endfor %}
-  <button type="submit" class="btn btn-primary">&gt; Save All Settings</button>
+  <button type="submit" class="btn btn-primary">&gt; Save Settings</button>
 </form>
 
-<!-- Admin Account -->
+<!-- ===== HOMEPAGE ===== -->
+<div style="max-width:680px; margin-top:2.5rem; padding-top:1.5rem; border-top:2px solid var(--border);">
+  <div class="section-title" style="margin-bottom:1.25rem;"><span>// HOMEPAGE</span></div>
+
+  <form action="/admin/settings/update-homepage" method="post" id="homepageForm">
+    <input type="hidden" name="homepage_selected_albums" id="homepageSelectedAlbums"
+           value="{{ current.get('homepage_selected_albums', '') }}">
+    <input type="hidden" name="homepage_photo_id" id="homepagePhotoId"
+           value="{{ current.get('homepage_photo_id', '') }}">
+
+    <!-- Mode selector -->
+    <div class="form-group">
+      <label class="form-label">Display Mode</label>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.3rem;">
+        {% for val, label in [
+            ('all_albums',      'All public top-level albums (default grid)'),
+            ('selected_albums', 'Selected albums only (you choose which)'),
+            ('page',            'A Page from your Pages list'),
+            ('random_photo',    'Random photo from an album (auto-rotation)'),
+            ('specific_photo',  'One specific pinned photo'),
+        ] %}
+        <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;">
+          <input type="radio" name="homepage_mode" value="{{ val }}"
+                 {% if current.get('homepage_mode', 'all_albums') == val %}checked{% endif %}
+                 onchange="showModePanel('{{ val }}')" style="margin-top:3px;">
+          <div>
+            <span style="font-size:0.88rem;color:var(--fg);">{{ val | upper }}</span>
+            <span style="font-size:0.72rem;color:#444;margin-left:0.5rem;">{{ label }}</span>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Panel: selected_albums -->
+    <div id="panel-selected_albums" class="mode-panel"
+         style="display:none;margin-top:1rem;padding:0.75rem;background:var(--dim2);border:1px solid var(--border);">
+      <div style="font-size:0.78rem;color:#555;margin-bottom:0.5rem;">Click albums to toggle selection. Drag to reorder (order is preserved on homepage).</div>
+      <div class="album-picker-grid" id="albumPickerGrid">
+        {% for album in albums %}
+        {% if album.is_public %}
+        <div class="ap-item {% if album.id in selected_ids %}ap-sel{% endif %}"
+             data-id="{{ album.id }}" onclick="apToggle(this)">
+          {% if album.cover_thumb_path %}
+            <img src="/media/{{ album.cover_thumb_path }}" loading="lazy">
+          {% else %}
+            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#333;font-size:0.6rem;">□</div>
+          {% endif %}
+          <div class="ap-item-label">{{ album.title[:14] }}</div>
+          <div class="ap-check">✓</div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      <div style="font-size:0.7rem;color:#333;margin-top:0.4rem;">
+        <span id="apCount">{{ selected_ids | length }}</span> selected
+      </div>
+    </div>
+
+    <!-- Panel: page -->
+    <div id="panel-page" class="mode-panel"
+         style="display:none;margin-top:1rem;">
+      <div class="form-group">
+        <label class="form-label">Page</label>
+        <select class="form-input" name="homepage_page_id" style="max-width:300px;">
+          <option value="">— Choose a page</option>
+          {% for p in pages %}
+          <option value="{{ p.id }}" {% if current.get('homepage_page_id', '') == p.id|string %}selected{% endif %}>
+            {{ p.title }}
+          </option>
+          {% endfor %}
+        </select>
+        {% if not pages %}
+        <div style="font-size:0.72rem;color:#555;margin-top:0.3rem;">No published pages yet. Create one in Pages.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Panel: random_photo -->
+    <div id="panel-random_photo" class="mode-panel"
+         style="display:none;margin-top:1rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="form-group">
+          <label class="form-label">Source Album</label>
+          <select class="form-input" name="homepage_album_id">
+            <option value="">— Choose album</option>
+            {% for album in albums %}
+            {% if album.is_public %}
+            <option value="{{ album.id }}" {% if current.get('homepage_album_id', '') == album.id|string %}selected{% endif %}>
+              {{ album.title }}
+            </option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rotation</label>
+          <select class="form-input" name="homepage_rotation">
+            {% for val, label in [('reload','Every page load'),('daily','Daily'),('weekly','Weekly'),('monthly','Monthly')] %}
+            <option value="{{ val }}" {% if current.get('homepage_rotation', 'reload') == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: specific_photo -->
+    <div id="panel-specific_photo" class="mode-panel"
+         style="display:none;margin-top:1rem;">
+      <div class="form-group">
+        <label class="form-label">Pick a Photo</label>
+        {% if current.get('homepage_photo_id') %}
+        <div style="margin-bottom:0.5rem;font-size:0.72rem;color:var(--accent);">Current: photo ID {{ current.get('homepage_photo_id') }}</div>
+        {% endif %}
+        <div class="photo-picker-grid">
+          {% for photo in photos %}
+          <div class="pp-item {% if current.get('homepage_photo_id', '') == photo.id|string %}pp-sel{% endif %}"
+               data-id="{{ photo.id }}" onclick="ppSelect(this)">
+            {% if photo.thumb_path %}
+              <img src="/media/{{ photo.thumb_path }}" loading="lazy" alt="">
+            {% else %}
+              <div style="width:100%;height:100%;background:#111;"></div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <div style="font-size:0.7rem;color:#333;margin-top:0.3rem;">Click to select. Selected: photo ID <span id="ppSelectedId">{{ current.get('homepage_photo_id', 'none') }}</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.25rem;">
+      <button type="submit" class="btn btn-primary"
+              onclick="collectHomepageData()">&gt; Save Homepage Settings</button>
+    </div>
+  </form>
+</div>
+
+<!-- ===== ADMIN ACCOUNT ===== -->
 <div style="max-width:640px; margin-top:2.5rem; padding-top:1.5rem; border-top:2px solid var(--border);">
   <div class="section-title" style="margin-bottom:0.85rem;"><span>// ADMIN ACCOUNT</span></div>
-
-  {% if account_saved %}
-  <div class="alert-success">✓ Account updated. You are still logged in.</div>
-  {% endif %}
-  {% if account_error %}
-  <div class="login-error" style="margin-bottom:1rem;">! {{ account_error }}</div>
-  {% endif %}
-
+  {% if account_saved %}<div class="alert-success">✓ Account updated. You are still logged in.</div>{% endif %}
+  {% if account_error %}<div class="login-error" style="margin-bottom:1rem;">! {{ account_error }}</div>{% endif %}
   <form action="/admin/settings/update-account" method="post">
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
       <div class="form-group">
         <label class="form-label">Current Username</label>
-        <input class="form-input" type="text" value="{{ current_username }}" disabled
-               style="opacity:0.5; cursor:not-allowed;">
+        <input class="form-input" type="text" value="{{ current_username }}" disabled style="opacity:0.5;cursor:not-allowed;">
       </div>
       <div class="form-group">
         <label class="form-label">New Username <span style="color:#555;font-size:0.75rem;">(leave empty to keep)</span></label>
-        <input class="form-input" type="text" name="new_username"
-               placeholder="new username" autocomplete="username">
+        <input class="form-input" type="text" name="new_username" placeholder="new username" autocomplete="username">
       </div>
     </div>
-
     <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
       <div class="form-group">
         <label class="form-label">Current Password <span style="color:#ff4444;font-size:0.75rem;">*</span></label>
-        <input class="form-input" type="password" name="current_password"
-               placeholder="required to save" autocomplete="current-password" required>
+        <input class="form-input" type="password" name="current_password" placeholder="required" autocomplete="current-password" required>
       </div>
       <div class="form-group">
         <label class="form-label">New Password <span style="color:#555;font-size:0.75rem;">(leave empty to keep)</span></label>
-        <input class="form-input" type="password" name="new_password"
-               placeholder="min 6 chars" autocomplete="new-password">
+        <input class="form-input" type="password" name="new_password" placeholder="min 6 chars" autocomplete="new-password">
       </div>
       <div class="form-group">
         <label class="form-label">Confirm New Password</label>
-        <input class="form-input" type="password" name="confirm_password"
-               placeholder="repeat new password" autocomplete="new-password">
+        <input class="form-input" type="password" name="confirm_password" placeholder="repeat" autocomplete="new-password">
       </div>
     </div>
-
     <button type="submit" class="btn btn-primary">&gt; Update Account</button>
   </form>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
 <script>
+// ─ Color pickers
 function syncColor(key, val) {
-  const hidden = document.getElementById(key);
-  const picker = document.getElementById(key + '_picker');
-  const text   = document.getElementById(key + '_text');
-  if (hidden) hidden.value = val;
-  if (picker && /^#[0-9a-fA-F]{6}$/.test(val)) picker.value = val;
-  if (text && document.activeElement !== text) text.value = val;
+  const h = document.getElementById(key);
+  const p = document.getElementById(key + '_picker');
+  const t = document.getElementById(key + '_text');
+  if (h) h.value = val;
+  if (p && /^#[0-9a-fA-F]{6}$/.test(val)) p.value = val;
+  if (t && document.activeElement !== t) t.value = val;
 }
 function clearColor(key) {
-  document.getElementById(key).value           = '';
-  document.getElementById(key + '_text').value  = '';
+  document.getElementById(key).value = '';
+  document.getElementById(key + '_text').value = '';
   const p = document.getElementById(key + '_picker');
   if (p) p.value = '#000000';
+}
+
+// ─ Homepage mode panels
+const PANELS = ['all_albums','selected_albums','page','random_photo','specific_photo'];
+function showModePanel(mode) {
+  PANELS.forEach(m => {
+    const el = document.getElementById('panel-' + m);
+    if (el) el.style.display = (m === mode) ? '' : 'none';
+  });
+}
+// Init on load
+const currentMode = document.querySelector('[name="homepage_mode"]:checked');
+if (currentMode) showModePanel(currentMode.value);
+
+// ─ Album picker (selected_albums)
+let apSelected = new Set({{ selected_ids | tojson }});
+function apToggle(el) {
+  const id = String(el.dataset.id);
+  if (apSelected.has(id)) { apSelected.delete(id); el.classList.remove('ap-sel'); }
+  else                    { apSelected.add(id);    el.classList.add('ap-sel'); }
+  document.getElementById('apCount').textContent = apSelected.size;
+}
+
+// ─ Photo picker (specific_photo)
+function ppSelect(el) {
+  document.querySelectorAll('.pp-item').forEach(p => p.classList.remove('pp-sel'));
+  el.classList.add('pp-sel');
+  document.getElementById('homepagePhotoId').value = el.dataset.id;
+  document.getElementById('ppSelectedId').textContent = el.dataset.id;
+}
+
+// ─ Collect before submit
+function collectHomepageData() {
+  // Build ordered comma-separated IDs from the grid (preserves visual order)
+  const grid = document.getElementById('albumPickerGrid');
+  if (grid) {
+    const ordered = Array.from(grid.querySelectorAll('.ap-item.ap-sel')).map(el => el.dataset.id);
+    document.getElementById('homepageSelectedAlbums').value = ordered.join(',');
+  }
 }
 </script>
 {% endblock %}

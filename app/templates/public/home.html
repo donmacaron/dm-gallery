@@ -3,48 +3,24 @@
 
 {% block content %}
 
-{% if featured_album and media_items %}
-  {# Featured album view: show photos directly #}
-  <div class="album-header">
-    <h1 class="album-title">{{ featured_album.title }}</h1>
-    {% if featured_album.description %}
-      <div class="album-desc">{{ featured_album.description }}</div>
-    {% endif %}
-    <div class="album-meta"><span>{{ media_items|length }} photos</span></div>
-  </div>
+{# ============================================================
+   MODE: all_albums / selected_albums
+   ============================================================ #}
+{% if mode in ('all_albums', 'selected_albums') %}
 
-  <div class="media-grid" id="mediaGrid">
-    {% for item in media_items %}
-    <div class="media-thumb lazy-item" onclick="openLightbox({{ loop.index0 }})">
-      {% if item.thumb_path %}
-        <img src="/media/{{ item.thumb_path }}" alt="{{ item.original_filename }}" loading="lazy">
-      {% else %}
-        <div class="media-thumb-placeholder">{{ item.media_type|upper }}</div>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
-
-  {% include "public/_lightbox.html" %}
-
-{% elif albums %}
-  {# Default: grid of all top-level albums #}
+  {% if albums %}
   <div class="section-title" style="margin-bottom:1rem;">
     <span>// GALLERY</span>
     <span style="font-size:0.8rem;color:#333;">{{ albums|length }} album{% if albums|length != 1 %}s{% endif %}</span>
   </div>
-
   <div class="album-grid">
     {% for album in albums %}
     <a href="/a/{{ album.slug }}" class="album-card lazy-item">
       {% if album.cover_thumb_path %}
         <img src="/media/{{ album.cover_thumb_path }}" alt="{{ album.title }}" loading="lazy">
       {% else %}
-        <div class="album-card-no-cover">
-          <span class="album-icon">□</span>
-        </div>
+        <div class="album-card-no-cover"><span class="album-icon">□</span></div>
       {% endif %}
-      {# Inject dominant color as CSS custom property on the overlay #}
       <div class="album-card-overlay"
            {% if album.dominant_color %}style="--album-title-color:{{ album.dominant_color }};"{% endif %}>
         <div class="album-card-title">{{ album.title }}</div>
@@ -52,24 +28,70 @@
     </a>
     {% endfor %}
   </div>
-
-{% else %}
+  {% else %}
   <div style="text-align:center;padding:4rem;color:#333;letter-spacing:0.1em;">
     [ NO ALBUMS PUBLISHED YET ]
   </div>
+  {% endif %}
+
+{# ============================================================
+   MODE: page
+   ============================================================ #}
+{% elif mode == 'page' %}
+
+  {% if page %}
+  <article class="page-content">
+    <h1 style="margin-bottom:1.25rem;font-size:2rem;letter-spacing:0.04em;">{{ page.title }}</h1>
+    {% if page.cover_url %}
+    <div style="margin-bottom:1.5rem;">
+      <img src="{{ page.cover_url }}" alt="{{ page.title }}"
+           style="max-width:100%;height:auto;border:1px solid var(--border);display:block;">
+    </div>
+    {% endif %}
+    <div class="page-body" style="line-height:1.7;font-size:1rem;">
+      {{ page.content_html | safe }}
+    </div>
+  </article>
+  {% else %}
+  <div style="text-align:center;padding:4rem;color:#333;letter-spacing:0.1em;">[ PAGE NOT FOUND ]</div>
+  {% endif %}
+
+{# ============================================================
+   MODE: random_photo / specific_photo
+   ============================================================ #}
+{% elif mode in ('random_photo', 'specific_photo') %}
+
+  {% if photo %}
+  <div class="homepage-photo" onclick="openLightbox(0)"
+       style="cursor:pointer;position:relative;">
+    <img src="/media/{{ photo.web_path or photo.thumb_path }}"
+         alt="{{ photo.original_filename }}"
+         style="display:block;max-width:100%;max-height:85vh;margin:0 auto;
+                border:1px solid var(--border);object-fit:contain;">
+  </div>
+  {% if mode == 'random_photo' %}
+  <div style="text-align:center;font-size:0.72rem;color:#2a2a2a;
+              letter-spacing:0.12em;margin-top:0.6rem;">
+    {{ site.get('homepage_rotation','reload') | upper }} ROTATION
+  </div>
+  {% endif %}
+
+  {% include "public/_lightbox.html" %}
+  {% else %}
+  <div style="text-align:center;padding:4rem;color:#333;letter-spacing:0.1em;">[ PHOTO NOT FOUND ]</div>
+  {% endif %}
+
 {% endif %}
 
 {% endblock %}
 
 {% block extra_js %}
-{% if media_items %}
+{% if photo %}
 <script>
 const MEDIA = [
-  {% for item in media_items %}
-  { id:{{ item.id }}, webPath:"{{ item.web_path or '' }}",
-    name:"{{ item.original_filename|replace('"','') }}",
-    w:{{ item.width or 0 }}, h:{{ item.height or 0 }} },
-  {% endfor %}
+  { id:{{ photo.id }}, webPath:"{{ photo.web_path or '' }}",
+    name:"{{ photo.original_filename|replace('"','') }}",
+    w:{{ photo.width or 0 }}, h:{{ photo.height or 0 }} }
 ];
 </script>
 {% endif %}

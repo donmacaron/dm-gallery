@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 from app.auth import authenticate_admin, create_access_token, hash_password, require_admin
 from app.config import get_settings
 from app.database import get_db
+from app.models.album import Album
+from app.models.media import Media
+from app.models.page import Page
 from app.models.setting import Setting
 
 router = APIRouter(tags=["admin-settings"])
@@ -39,9 +42,7 @@ SETTINGS_GROUPS = [
         ("theme_scanline_opacity", "text",  "Scanline Opacity (0.0 \u2013 0.3)"),
         ("theme_font",             "text",  "Primary Font (Google Fonts name)"),
     ]),
-    ("Homepage", [
-        ("homepage_album_id", "text", "Featured Album ID (empty = list all)"),
-    ]),
+    # Homepage is handled separately via its own form
 ]
 
 
@@ -58,19 +59,31 @@ def _upsert(db: Session, key: str, value: str):
         db.add(Setting(key=key, value=value))
 
 
+def _get_settings_map(db: Session) -> dict:
+    return {s.key: s.value for s in db.query(Setting).all()}
+
+
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, db: Session = Depends(get_db)):
     admin = require_admin(request)
     if not admin:
         return RedirectResponse("/admin/login", status_code=302)
-    rows    = db.query(Setting).all()
-    current = {s.key: s.value for s in rows}
+    current = _get_settings_map(db)
+    albums  = db.query(Album).order_by(Album.sort_order, Album.title).all()
+    pages   = db.query(Page).filter(Page.is_published == True).order_by(Page.title).all()
+    photos  = db.query(Media).filter(
+        Media.media_type == "photo", Media.conversion_status == "done"
+    ).order_by(Media.created_at.desc()).limit(200).all()
+    # Parse selected album IDs for the selected_albums mode
+    selected_ids = [int(x) for x in current.get("homepage_selected_albums", "").split(",") if x.strip().isdigit()]
     return templates.TemplateResponse(request, "admin/settings/index.html", {
         "admin": admin, "site_title": settings_obj.site_title,
         "active": "settings", "groups": SETTINGS_GROUPS,
         "current": current, "saved": False,
         "current_username": _current_username(db),
         "account_error": None, "account_saved": False,
+        "albums": albums, "pages": pages, "photos": photos,
+        "selected_ids": selected_ids,
     })
 
 
@@ -85,14 +98,56 @@ async def settings_update(request: Request, db: Session = Depends(get_db)):
             value = "1" if (ftype == "checkbox" and form.get(key)) else str(form.get(key, "") or "")
             _upsert(db, key, value)
     db.commit()
-    rows    = db.query(Setting).all()
-    current = {s.key: s.value for s in rows}
+    current = _get_settings_map(db)
+    albums  = db.query(Album).order_by(Album.sort_order, Album.title).all()
+    pages   = db.query(Page).filter(Page.is_published == True).order_by(Page.title).all()
+    photos  = db.query(Media).filter(
+        Media.media_type == "photo", Media.conversion_status == "done"
+    ).order_by(Media.created_at.desc()).limit(200).all()
+    selected_ids = [int(x) for x in current.get("homepage_selected_albums", "").split(",") if x.strip().isdigit()]
     return templates.TemplateResponse(request, "admin/settings/index.html", {
         "admin": admin, "site_title": settings_obj.site_title,
         "active": "settings", "groups": SETTINGS_GROUPS,
         "current": current, "saved": True,
         "current_username": _current_username(db),
         "account_error": None, "account_saved": False,
+        "albums": albums, "pages": pages, "photos": photos,
+        "selected_ids": selected_ids,
+    })
+
+
+@router.post("/settings/update-homepage", response_class=HTMLResponse)
+async def settings_update_homepage(request: Request, db: Session = Depends(get_db)):
+    """Save homepage mode settings."""
+    admin = require_admin(request)
+    if not admin:
+        return RedirectResponse("/admin/login", status_code=302)
+    form = await request.form()
+
+    mode = str(form.get("homepage_mode", "all_albums"))
+    _upsert(db, "homepage_mode", mode)
+    _upsert(db, "homepage_album_id",        str(form.get("homepage_album_id",        "") or ""))
+    _upsert(db, "homepage_page_id",         str(form.get("homepage_page_id",         "") or ""))
+    _upsert(db, "homepage_photo_id",        str(form.get("homepage_photo_id",        "") or ""))
+    _upsert(db, "homepage_rotation",        str(form.get("homepage_rotation",        "reload") or "reload"))
+    _upsert(db, "homepage_selected_albums", str(form.get("homepage_selected_albums", "") or ""))
+    db.commit()
+
+    current      = _get_settings_map(db)
+    albums       = db.query(Album).order_by(Album.sort_order, Album.title).all()
+    pages        = db.query(Page).filter(Page.is_published == True).order_by(Page.title).all()
+    photos       = db.query(Media).filter(
+        Media.media_type == "photo", Media.conversion_status == "done"
+    ).order_by(Media.created_at.desc()).limit(200).all()
+    selected_ids = [int(x) for x in current.get("homepage_selected_albums", "").split(",") if x.strip().isdigit()]
+    return templates.TemplateResponse(request, "admin/settings/index.html", {
+        "admin": admin, "site_title": settings_obj.site_title,
+        "active": "settings", "groups": SETTINGS_GROUPS,
+        "current": current, "homepage_saved": True, "saved": False,
+        "current_username": _current_username(db),
+        "account_error": None, "account_saved": False,
+        "albums": albums, "pages": pages, "photos": photos,
+        "selected_ids": selected_ids,
     })
 
 
@@ -101,16 +156,19 @@ async def settings_update_account(request: Request, db: Session = Depends(get_db
     admin = require_admin(request)
     if not admin:
         return RedirectResponse("/admin/login", status_code=302)
-
     form         = await request.form()
     new_username = str(form.get("new_username", "")).strip()
     current_pw   = str(form.get("current_password", ""))
     new_pw       = str(form.get("new_password", ""))
     confirm_pw   = str(form.get("confirm_password", ""))
-
-    rows         = db.query(Setting).all()
-    current      = {s.key: s.value for s in rows}
+    current      = _get_settings_map(db)
     cur_username = _current_username(db)
+    albums       = db.query(Album).order_by(Album.sort_order, Album.title).all()
+    pages        = db.query(Page).filter(Page.is_published == True).order_by(Page.title).all()
+    photos       = db.query(Media).filter(
+        Media.media_type == "photo", Media.conversion_status == "done"
+    ).order_by(Media.created_at.desc()).limit(200).all()
+    selected_ids = [int(x) for x in current.get("homepage_selected_albums", "").split(",") if x.strip().isdigit()]
 
     def _render(error=None, saved=False):
         return templates.TemplateResponse(request, "admin/settings/index.html", {
@@ -119,6 +177,8 @@ async def settings_update_account(request: Request, db: Session = Depends(get_db
             "current": current, "saved": False,
             "current_username": cur_username,
             "account_error": error, "account_saved": saved,
+            "albums": albums, "pages": pages, "photos": photos,
+            "selected_ids": selected_ids,
         })
 
     if not authenticate_admin(cur_username, current_pw):
@@ -130,7 +190,6 @@ async def settings_update_account(request: Request, db: Session = Depends(get_db
             return _render(error="New password must be at least 6 characters.")
     if new_username and len(new_username) < 2:
         return _render(error="Username must be at least 2 characters.")
-
     if new_username:
         _upsert(db, "admin_username", new_username)
         cur_username = new_username
@@ -143,14 +202,15 @@ async def settings_update_account(request: Request, db: Session = Depends(get_db
         data={"sub": cur_username},
         expires_delta=timedelta(minutes=settings_obj.access_token_expire_minutes),
     )
-    rows    = db.query(Setting).all()
-    current = {s.key: s.value for s in rows}
+    current = _get_settings_map(db)
     resp = templates.TemplateResponse(request, "admin/settings/index.html", {
         "admin": cur_username, "site_title": settings_obj.site_title,
         "active": "settings", "groups": SETTINGS_GROUPS,
         "current": current, "saved": False,
         "current_username": cur_username,
         "account_error": None, "account_saved": True,
+        "albums": albums, "pages": pages, "photos": photos,
+        "selected_ids": selected_ids,
     })
     resp.set_cookie(
         key="admin_token", value=token,
