@@ -13,19 +13,118 @@
 .ql-toolbar .ql-fill   { fill:#444; }
 .ql-toolbar button:hover .ql-stroke { stroke:var(--fg); }
 .ql-toolbar button:hover .ql-fill   { fill:var(--fg); }
-.ql-editor { min-height:300px; font-family:'Share Tech Mono',monospace; font-size:1rem; }
+.ql-editor { min-height:300px; font-family:'Share Tech Mono',monospace; font-size:1rem; color:var(--fg); }
 .ql-editor.ql-blank::before { color:#2a2a2a; font-style:normal; }
 .ql-container { border-color:var(--border2) !important; }
 
-/* Cover picker grid */
+/* Custom toolbar buttons */
+.ql-photo-btn, .ql-album-btn {
+  background: none;
+  border: 1px solid #333 !important;
+  color: #555 !important;
+  font-size: 0.65rem !important;
+  padding: 1px 5px !important;
+  cursor: pointer;
+  line-height: 1.4;
+  border-radius: 0 !important;
+  transition: all 0.12s;
+}
+.ql-photo-btn:hover, .ql-album-btn:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* Album embed chip in editor */
+.ql-editor .album-embed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,102,0,0.08);
+  border: 1px solid var(--accent);
+  padding: 3px 8px;
+  font-size: 0.78rem;
+  color: var(--accent);
+  cursor: default;
+  user-select: none;
+  margin: 2px 0;
+}
+
+/* Picker overlays */
+.picker-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+}
+.picker-overlay.open { display: flex; }
+.picker-box {
+  background: #0c0c0c;
+  border: 1px solid var(--border2);
+  width: min(92vw, 860px);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.picker-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem; letter-spacing: 0.1em; color: var(--fg);
+  flex-shrink: 0;
+}
+.picker-close {
+  background: none; border: 1px solid #333;
+  color: #555; font-family: var(--font); font-size: 1rem;
+  padding: 1px 8px; cursor: pointer;
+}
+.picker-close:hover { border-color: var(--accent); color: var(--accent); }
+.picker-body { overflow-y: auto; padding: 0.75rem; flex: 1; }
+
+/* Photo grid inside picker */
+.photo-picker-overlay-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 3px;
+}
+.photo-picker-overlay-grid .pitem {
+  aspect-ratio: 1; overflow: hidden;
+  border: 2px solid transparent; cursor: pointer; background: #111;
+  transition: border-color 0.1s;
+}
+.photo-picker-overlay-grid .pitem:hover { border-color: var(--accent); }
+.photo-picker-overlay-grid .pitem img {
+  width:100%; height:100%; object-fit:cover; display:block;
+}
+
+/* Album grid inside picker */
+.album-picker-overlay-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
+}
+.album-picker-overlay-grid .aitem {
+  border: 2px solid var(--border); cursor: pointer; background: #111;
+  transition: border-color 0.1s; overflow: hidden;
+}
+.album-picker-overlay-grid .aitem:hover { border-color: var(--accent); }
+.album-picker-overlay-grid .aitem img {
+  width:100%; aspect-ratio:4/3; object-fit:cover; display:block;
+}
+.album-picker-overlay-grid .aitem .a-title {
+  padding: 4px 6px; font-size: 0.72rem;
+  color: var(--fg); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Cover picker */
 .cover-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 3px;
-  max-height: 280px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  padding: 3px;
+  gap: 3px; max-height: 280px; overflow-y: auto;
+  border: 1px solid var(--border); padding: 3px;
   background: var(--dim2);
 }
 .cover-item {
@@ -33,9 +132,9 @@
   overflow:hidden; border:2px solid transparent;
   cursor:pointer; transition:border-color 0.1s;
 }
-.cover-item:hover    { border-color:var(--border2); }
-.cover-item.active   { border-color:var(--accent); }
-.cover-item img      { width:100%; height:100%; object-fit:cover; display:block; }
+.cover-item:hover  { border-color: var(--border2); }
+.cover-item.active { border-color: var(--accent); }
+.cover-item img    { width:100%; height:100%; object-fit:cover; display:block; }
 </style>
 {% endblock %}
 
@@ -60,23 +159,22 @@
              value="{% if page %}{{ page.title }}{% endif %}" required autofocus>
     </div>
     <div class="form-group">
-      <label class="form-label">Cover URL (external, optional)</label>
+      <label class="form-label">Cover URL <span style="color:#333;font-size:0.72rem;">(external, or pick below)</span></label>
       <input class="form-input" type="text" name="cover_url" id="coverUrl"
              value="{% if page and page.cover_url %}{{ page.cover_url }}{% endif %}"
-             placeholder="https://... or pick from library below">
+             placeholder="https://... or pick from library">
     </div>
   </div>
 
-  <!-- Cover image picker from library -->
+  <!-- Cover picker from library -->
   {% if photos %}
   <div class="form-group">
-    <label class="form-label" style="display:flex; justify-content:space-between;">
+    <label class="form-label" style="display:flex;justify-content:space-between;">
       <span>Cover Image from Library</span>
       <button type="button" class="btn btn-sm" onclick="toggleCoverPicker()">Show / Hide</button>
     </label>
-    <div id="coverPickerPanel" style="display:none; margin-top:0.5rem;">
+    <div id="coverPickerPanel" style="display:none;margin-top:0.5rem;">
       <div class="cover-grid" id="coverGrid">
-        <!-- None option -->
         <div class="cover-item" data-url="" onclick="pickCover(this, '')" title="No cover">
           <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:#333;">NONE</div>
         </div>
@@ -85,24 +183,54 @@
              data-url="/media/{{ photo.web_path }}"
              onclick="pickCover(this, '/media/{{ photo.web_path }}')"
              title="{{ photo.original_filename }}">
-          <img src="/media/{{ photo.thumb_path }}" loading="lazy" alt="{{ photo.original_filename }}">
+          <img src="/media/{{ photo.thumb_path }}" loading="lazy">
         </div>
         {% endfor %}
       </div>
-      <div style="font-size:0.65rem; color:#2a2a2a; margin-top:0.3rem;">Click to select. URL field is updated automatically.</div>
+      <div style="font-size:0.65rem;color:#2a2a2a;margin-top:0.3rem;">Click to select.</div>
     </div>
   </div>
   {% endif %}
 
+  <!-- Quill editor -->
   <div class="form-group">
     <label class="form-label">Content</label>
+    <div id="editor-toolbar">
+      <span class="ql-formats">
+        <select class="ql-header"><option value="1"></option><option value="2"></option><option value="3"></option><option selected></option></select>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-bold"></button>
+        <button class="ql-italic"></button>
+        <button class="ql-underline"></button>
+        <button class="ql-strike"></button>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-list" value="ordered"></button>
+        <button class="ql-list" value="bullet"></button>
+        <button class="ql-blockquote"></button>
+        <button class="ql-code-block"></button>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-link"></button>
+        <button class="ql-image"></button>
+      </span>
+      <span class="ql-formats">
+        <!-- Custom: insert from media library -->
+        <button type="button" class="ql-photo-btn" onclick="openPhotoPicker()" title="Insert photo from library">📷 Photo</button>
+        <button type="button" class="ql-album-btn" onclick="openAlbumPicker()" title="Insert album card">📁 Album</button>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-clean"></button>
+      </span>
+    </div>
     <div id="editor-container"></div>
   </div>
 
   <input type="hidden" name="content_html"  id="content_html">
   <input type="hidden" name="content_delta" id="content_delta">
 
-  <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-top:0.75rem;">
+  <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-top:0.75rem;">
     <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
       <input type="checkbox" name="is_published" value="on"
              {% if page and page.is_published %}checked{% endif %}>
@@ -116,8 +244,69 @@
     </form>
     {% endif %}
   </div>
-
 </form>
+
+<!-- ============================================================
+     PHOTO PICKER OVERLAY
+     ============================================================ -->
+<div class="picker-overlay" id="photoPickerOverlay">
+  <div class="picker-box">
+    <div class="picker-header">
+      <span>// INSERT PHOTO FROM LIBRARY</span>
+      <button class="picker-close" onclick="closePhotoPicker()">[ × CLOSE ]</button>
+    </div>
+    <div class="picker-body">
+      <div class="photo-picker-overlay-grid" id="photoOverlayGrid">
+        {% for photo in editor_photos %}
+        <div class="pitem" data-web="{{ photo.web_path }}" data-thumb="{{ photo.thumb_path }}"
+             data-w="{{ photo.width or 0 }}" data-h="{{ photo.height or 0 }}"
+             onclick="insertPhoto(this)">
+          <img src="/media/{{ photo.thumb_path }}" loading="lazy"
+               alt="{{ photo.original_filename }}">
+        </div>
+        {% endfor %}
+      </div>
+      {% if not editor_photos %}
+      <div style="color:#333;font-size:0.82rem;padding:1rem;">No photos in library yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     ALBUM PICKER OVERLAY
+     ============================================================ -->
+<div class="picker-overlay" id="albumPickerOverlay">
+  <div class="picker-box">
+    <div class="picker-header">
+      <span>// INSERT ALBUM CARD</span>
+      <button class="picker-close" onclick="closeAlbumPicker()">[ × CLOSE ]</button>
+    </div>
+    <div class="picker-body">
+      <div style="font-size:0.72rem;color:#555;margin-bottom:0.75rem;">
+        Clicking an album inserts a cover+title card that links to the album page.
+      </div>
+      <div class="album-picker-overlay-grid" id="albumOverlayGrid">
+        {% for album in editor_albums %}
+        <div class="aitem" data-id="{{ album.id }}" data-title="{{ album.title }}"
+             data-slug="{{ album.slug }}" data-cover="{{ album.cover_thumb_path or '' }}"
+             onclick="insertAlbum(this)">
+          {% if album.cover_thumb_path %}
+            <img src="/media/{{ album.cover_thumb_path }}" loading="lazy" alt="{{ album.title }}">
+          {% else %}
+            <div style="width:100%;aspect-ratio:4/3;background:#111;display:flex;align-items:center;justify-content:center;color:#333;font-size:0.6rem;">□</div>
+          {% endif %}
+          <div class="a-title">{{ album.title }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if not editor_albums %}
+      <div style="color:#333;font-size:0.82rem;padding:1rem;">No public albums yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -125,24 +314,14 @@
 <script>
 const quill = new Quill('#editor-container', {
   theme: 'snow',
+  modules: { toolbar: '#editor-toolbar' },
   placeholder: 'Write your page content here…',
-  modules: {
-    toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ list: 'ordered' }, { list: 'bullet' }],
-      ['blockquote', 'code-block'],
-      ['link'],
-      ['clean']
-    ]
-  }
 });
 
 {% if not is_new and page and page.content_delta %}
 try {
-  const delta = {{ page.content_delta | safe }};
-  quill.setContents(delta);
-} catch(e) { console.warn('Could not load delta:', e); }
+  quill.setContents({{ page.content_delta | safe }});
+} catch(e) { console.warn('Delta load failed:', e); }
 {% endif %}
 
 document.getElementById('page-form').addEventListener('submit', function() {
@@ -150,16 +329,66 @@ document.getElementById('page-form').addEventListener('submit', function() {
   document.getElementById('content_delta').value = JSON.stringify(quill.getContents());
 });
 
-// Cover picker
+// ── Cover picker
 function toggleCoverPicker() {
   const p = document.getElementById('coverPickerPanel');
   p.style.display = p.style.display === 'none' ? '' : 'none';
 }
-
 function pickCover(el, url) {
   document.querySelectorAll('.cover-item').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('coverUrl').value = url;
 }
+
+// ── Photo picker overlay
+function openPhotoPicker() {
+  document.getElementById('photoPickerOverlay').classList.add('open');
+}
+function closePhotoPicker() {
+  document.getElementById('photoPickerOverlay').classList.remove('open');
+}
+function insertPhoto(el) {
+  const webPath = el.dataset.web;
+  if (!webPath) return;
+  const range = quill.getSelection(true);
+  quill.insertEmbed(range.index, 'image', '/media/' + webPath, Quill.sources.USER);
+  quill.setSelection(range.index + 1, Quill.sources.SILENT);
+  closePhotoPicker();
+}
+
+// ── Album picker overlay
+function openAlbumPicker() {
+  document.getElementById('albumPickerOverlay').classList.add('open');
+}
+function closeAlbumPicker() {
+  document.getElementById('albumPickerOverlay').classList.remove('open');
+}
+function insertAlbum(el) {
+  const id    = el.dataset.id;
+  const title = el.dataset.title;
+  // Insert shortcode as styled non-editable text
+  const range = quill.getSelection(true);
+  const shortcode = `[[album:${id}]]`;
+  quill.insertText(range.index, shortcode, {
+    color: 'var(--accent)',
+    background: 'rgba(255,102,0,0.08)',
+    bold: false,
+  }, Quill.sources.USER);
+  quill.insertText(range.index + shortcode.length, ' ', {}, Quill.sources.USER);
+  quill.setSelection(range.index + shortcode.length + 1, Quill.sources.SILENT);
+  closeAlbumPicker();
+}
+
+// Close overlays on backdrop click
+document.getElementById('photoPickerOverlay').addEventListener('click', e => {
+  if (e.target.id === 'photoPickerOverlay') closePhotoPicker();
+});
+document.getElementById('albumPickerOverlay').addEventListener('click', e => {
+  if (e.target.id === 'albumPickerOverlay') closeAlbumPicker();
+});
+// Close on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closePhotoPicker(); closeAlbumPicker(); }
+});
 </script>
 {% endblock %}
