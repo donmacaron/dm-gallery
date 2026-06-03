@@ -9,9 +9,13 @@
 
   <button class="lightbox-nav lightbox-prev" onclick="lightboxNav(-1)">◄</button>
 
-  <div style="position:relative;display:flex;align-items:center;justify-content:center;max-width:90vw;max-height:80vh;">
+  <div id="lbMediaWrap" style="position:relative;display:flex;align-items:center;justify-content:center;max-width:90vw;max-height:80vh;">
     <img class="lightbox-img" id="lbImg" src="" alt="" draggable="false"
-         style="opacity:0;transition:opacity 0.2s;" onload="this.style.opacity=1">
+         style="display:none;opacity:0;transition:opacity 0.2s;">
+    <video id="lbVideo" controls
+           style="display:none;max-width:90vw;max-height:80vh;background:#000;"></video>
+    <audio id="lbAudio" controls
+           style="display:none;width:480px;max-width:90vw;margin:2rem 0;"></audio>
     <div id="lbSpinner" style="position:absolute;font-size:0.8rem;color:#333;letter-spacing:0.1em;">
       loading<span class="blink">█</span>
     </div>
@@ -20,8 +24,8 @@
   <button class="lightbox-nav lightbox-next" onclick="lightboxNav(1)">►</button>
 
   <div class="lightbox-bottom">
-    <a id="lbDl2k"   href="#" class="lightbox-dl hi" download>⬇ 2K VERSION</a>
-    <a id="lbDlOrig" href="#" class="lightbox-dl"    download>⬇ ORIGINAL</a>
+    <a id="lbDl2k"   href="#" class="lightbox-dl hi" download>&#x2B07; WEB VERSION</a>
+    <a id="lbDlOrig" href="#" class="lightbox-dl"    download>&#x2B07; ORIGINAL</a>
     <span id="lbDims" style="font-size:0.7rem;color:#333;letter-spacing:0.06em;"></span>
   </div>
 
@@ -34,12 +38,15 @@ function openLightbox(idx) {
   _lbIdx = idx;
   _lbUpdate();
   document.getElementById('lightbox').classList.add('is-open');
-  // Task 4: hide CRT scanlines + vignette while lightbox is open
   document.body.classList.add('lightbox-active');
   document.body.style.overflow = 'hidden';
 }
 
 function closeLightbox() {
+  const v = document.getElementById('lbVideo');
+  const a = document.getElementById('lbAudio');
+  if (v) { v.pause(); }
+  if (a) { a.pause(); }
   document.getElementById('lightbox').classList.remove('is-open');
   document.body.classList.remove('lightbox-active');
   document.body.style.overflow = '';
@@ -52,24 +59,51 @@ function lightboxNav(dir) {
 }
 
 function _lbUpdate() {
-  const m = MEDIA[_lbIdx];
-  const img = document.getElementById('lbImg');
+  const m       = MEDIA[_lbIdx];
+  const img     = document.getElementById('lbImg');
+  const video   = document.getElementById('lbVideo');
+  const audio   = document.getElementById('lbAudio');
   const spinner = document.getElementById('lbSpinner');
-  img.style.opacity = '0';
+  const dl2k    = document.getElementById('lbDl2k');
+
+  // Stop and hide all
+  video.pause(); video.removeAttribute('src'); video.load(); video.style.display = 'none';
+  audio.pause(); audio.removeAttribute('src'); audio.load(); audio.style.display = 'none';
+  img.style.display = 'none'; img.style.opacity = '0';
   spinner.style.display = 'block';
-  img.src = m.webPath ? '/media/' + m.webPath : '';
-  img.onload  = () => { spinner.style.display = 'none'; img.style.opacity = '1'; };
-  img.onerror = () => { spinner.style.display = 'none'; img.style.opacity = '0.3'; };
+
+  if (m.type === 'video') {
+    if (m.webPath) { video.src = '/media/' + m.webPath; video.load(); }
+    video.style.display = '';
+    spinner.style.display = 'none';
+    dl2k.style.display = 'none';
+  } else if (m.type === 'audio') {
+    if (m.webPath) { audio.src = '/media/' + m.webPath; audio.load(); }
+    audio.style.display = '';
+    spinner.style.display = 'none';
+    dl2k.style.display = 'none';
+  } else {
+    // photo / gif
+    img.style.display = '';
+    img.src = m.webPath ? '/media/' + m.webPath : '';
+    img.onload  = () => { spinner.style.display = 'none'; img.style.opacity = '1'; };
+    img.onerror = () => { spinner.style.display = 'none'; img.style.opacity = '0.3'; };
+    dl2k.style.display = '';
+  }
+
   document.getElementById('lbCounter').textContent  = (_lbIdx + 1) + ' / ' + MEDIA.length;
   document.getElementById('lbFilename').textContent = m.name || '';
-  document.getElementById('lbDl2k').href            = '/download/' + m.id + '/web';
-  document.getElementById('lbDlOrig').href          = '/download/' + m.id + '/original';
+  dl2k.href = '/download/' + m.id + '/web';
+  document.getElementById('lbDlOrig').href = '/download/' + m.id + '/original';
   const dims = document.getElementById('lbDims');
-  dims.textContent = m.w && m.h ? m.w + '×' + m.h : '';
-  // Preload neighbours
+  dims.textContent = m.w && m.h ? m.w + 'x' + m.h : '';
+
+  // Preload photo neighbours only
   [_lbIdx + 1, _lbIdx - 1].forEach(i => {
     const p = MEDIA[(i + MEDIA.length) % MEDIA.length];
-    if (p && p.webPath) { const x = new Image(); x.src = '/media/' + p.webPath; }
+    if (p && p.webPath && p.type !== 'video' && p.type !== 'audio') {
+      const x = new Image(); x.src = '/media/' + p.webPath;
+    }
   });
 }
 
