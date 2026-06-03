@@ -24,6 +24,8 @@ router = APIRouter(tags=["admin-upload"])
 templates = Jinja2Templates(directory="app/templates")
 settings = get_settings()
 
+CHUNK_SIZE = 1024 * 1024  # 1 MB — stream large files without RAM spike
+
 
 @router.get("/upload", response_class=HTMLResponse)
 async def upload_page(
@@ -48,13 +50,13 @@ async def upload_page(
 @router.post("/api/upload/single", response_class=JSONResponse)
 async def api_upload_single(
     request:  Request,
-    file:     UploadFile      = File(...),
-    album_id: Optional[str]   = Form(None),
-    db:       Session          = Depends(get_db),
+    file:     UploadFile    = File(...),
+    album_id: Optional[str] = Form(None),
+    db:       Session       = Depends(get_db),
 ):
     """
     Upload ONE file at a time.
-    The frontend queues files and calls this endpoint sequentially.
+    Streams directly to disk in 1 MB chunks — no full file RAM buffer.
     Returns JSON so the JS progress handler can update the UI.
     """
     admin = require_admin(request)
@@ -73,9 +75,23 @@ async def api_upload_single(
     unique     = uuid.uuid4().hex
     orig_path  = orig_dir / f"{unique}{ext}"
 
-    content = await file.read()
-    async with aiofiles.open(str(orig_path), "wb") as fh:
-        await fh.write(content)
+    # Stream file to disk in chunks — avoids loading entire file into RAM
+    file_size = 0
+    try:
+        async with aiofiles.open(str(orig_path), "wb") as fh:
+            while True:
+                chunk = await file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                await fh.write(chunk)
+                file_size += len(chunk)
+    except Exception as e:
+        # Clean up partial file on error
+        try:
+            orig_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return JSONResponse({"status": "error", "message": f"Write failed: {e}"})
 
     media = Media(
         original_filename  = file.filename,
@@ -83,14 +99,13 @@ async def api_upload_single(
         media_type         = media_type,
         album_id           = album_id_int,
         original_path      = str(orig_path),
-        file_size_original = len(content),
+        file_size_original = file_size,
         conversion_status  = "pending",
         sort_order         = 0,
     )
     db.add(media)
     db.flush()
 
-    # Insert into junction table if album assigned
     if album_id_int:
         db.execute(
             text("INSERT INTO album_media (album_id, media_id, sort_order) VALUES (:a, :m, 0)"),
