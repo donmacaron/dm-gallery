@@ -33,6 +33,7 @@
           <option value="external">External URL</option>
           <option value="page">Page</option>
           <option value="album">Album</option>
+          <option value="all_albums">All Albums</option>
         </select>
       </div>
 
@@ -72,9 +73,9 @@
 <script>
 function updateTypeFields() {
   const type = document.getElementById('type-select').value;
-  document.getElementById('field-external').style.display = type === 'external' ? '' : 'none';
-  document.getElementById('field-page').style.display     = type === 'page'     ? '' : 'none';
-  document.getElementById('field-album').style.display    = type === 'album'    ? '' : 'none';
+  document.getElementById('field-external').style.display = type === 'external'   ? '' : 'none';
+  document.getElementById('field-page').style.display     = type === 'page'       ? '' : 'none';
+  document.getElementById('field-album').style.display    = type === 'album'      ? '' : 'none';
 }
 </script>
 {% endblock %}

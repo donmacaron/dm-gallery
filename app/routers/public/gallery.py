@@ -69,6 +69,8 @@ def get_menu(db: Session) -> list:
                 result.append({"label": item.label, "url": f"/p/{page.slug}", "external": False})
         elif item.item_type == "external" and item.ext_url:
             result.append({"label": item.label, "url": item.ext_url, "external": True})
+        elif item.item_type == "all_albums":
+            result.append({"label": item.label, "url": "/albums", "external": False})
     return result
 
 
@@ -191,6 +193,22 @@ async def home(request: Request, db: Session = Depends(get_db)):
         })
 
     # Fallback
+    albums = (
+        db.query(Album)
+        .filter(Album.is_public == True, Album.parent_id == None)
+        .order_by(Album.sort_order, Album.created_at.desc())
+        .all()
+    )
+    return templates.TemplateResponse(request, "public/home.html", {
+        "site": site, "site_title": site["site_title"], "menu": menu,
+        "mode": "all_albums", "albums": albums,
+    })
+
+
+@router.get("/albums", response_class=HTMLResponse)
+async def all_albums_view(request: Request, db: Session = Depends(get_db)):
+    site   = get_site_ctx(db)
+    menu   = get_menu(db)
     albums = (
         db.query(Album)
         .filter(Album.is_public == True, Album.parent_id == None)
