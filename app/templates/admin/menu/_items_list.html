@@ -23,6 +23,7 @@
     <span style="font-size:0.65rem; color:#333; margin-left:0.5rem;">
       {% if item.item_type == 'page' and item.page %}/p/{{ item.page.slug }}
       {% elif item.item_type == 'album' and item.album %}/a/{{ item.album.slug }}
+      {% elif item.item_type == 'all_albums' %}/albums
       {% elif item.ext_url %}{{ item.ext_url[:30] }}…
       {% endif %}
     </span>

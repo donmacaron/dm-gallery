@@ -79,6 +79,9 @@ def convert_media_bg(media_id: int, job_id: str) -> None:
             result = process_gif(m.original_path, cfg.media_path, m.id)
         elif m.media_type == "video":
             result = process_video(m.original_path, cfg.media_path, m.id)
+        elif m.media_type == "audio":
+            from app.services.audio_processor import process_audio
+            result = process_audio(m.original_path, cfg.media_path, m.id)
         else:
             result = {"web_path": None, "thumb_path": None, "width": None,
                       "height": None, "file_size_web": None, "exif_json": None,

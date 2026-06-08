@@ -84,7 +84,8 @@ const MEDIA = [
   {% for item in media_items %}
   { id:{{ item.id }}, webPath:"{{ item.web_path or '' }}",
     name:"{{ item.original_filename|replace('"','') }}",
-    w:{{ item.width or 0 }}, h:{{ item.height or 0 }} },
+    w:{{ item.width or 0 }}, h:{{ item.height or 0 }},
+    type:"{{ item.media_type }}" },
   {% endfor %}
 ];
 </script>

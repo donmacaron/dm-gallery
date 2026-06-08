@@ -87,12 +87,33 @@ def process_video(
     except Exception:
         pass  # ffmpeg not installed or failed — thumb_file stays None
 
+    # Transcode to H.264 MP4 for web playback
+    mp4_file = f"{media_id}_web.mp4"
+    mp4_path  = videos_dir / mp4_file
+    web_path_result: Optional[str] = None
+
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", str(orig),
+                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                "-c:a", "aac", "-b:a", "128k",
+                "-movflags", "+faststart",
+                str(mp4_path),
+            ],
+            capture_output=True, timeout=300,
+        )
+        if mp4_path.exists() and mp4_path.stat().st_size > 0:
+            web_path_result = f"videos/{mp4_file}"
+    except Exception:
+        pass
+
     return {
-        "web_path":         None,   # Video web-encoding is post-MVP
+        "web_path":         web_path_result,
         "thumb_path":       f"videos/{thumb_file}" if thumb_file else None,
         "width":            width or None,
         "height":           height or None,
-        "file_size_web":    None,
+        "file_size_web":    mp4_path.stat().st_size if mp4_path.exists() else None,
         "exif_json":        None,
         "duration_seconds": duration or None,
     }
