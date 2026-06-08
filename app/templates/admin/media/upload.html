@@ -29,9 +29,103 @@
 .fstatus.uploading  { color:var(--accent); }
 .fstatus.done       { color:var(--fg); }
 .fstatus.error      { color:#ff4444; }
+.fstatus.skipped    { color:#999; }
 
 .upload-progress-bar  { height:2px; background:var(--border); margin-top:2px; }
 .upload-progress-fill { height:100%; background:var(--accent); width:0%; transition:width 0.3s; }
+
+/* ─── Error Modal ─── */
+.error-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: none; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.error-modal-overlay.visible { display: flex; }
+
+.error-modal {
+  background: var(--dim1); border: 1px solid var(--border);
+  border-radius: 4px; max-width: 600px; max-height: 80vh;
+  overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  width: 90%;
+}
+
+.error-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1rem; border-bottom: 1px solid var(--border);
+  font-weight: bold; font-size: 1rem;
+}
+
+.error-modal-close {
+  background: none; border: none; color: var(--fg); cursor: pointer;
+  font-size: 1.5rem; padding: 0; width: 24px; height: 24px;
+}
+
+.error-modal-content {
+  padding: 1rem;
+}
+
+.error-section {
+  margin-bottom: 1.5rem;
+}
+
+.error-section-title {
+  font-size: 0.85rem; font-weight: bold; color: #ff6600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 0.5rem; padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border2);
+}
+
+.error-item {
+  padding: 0.6rem 0.75rem; margin-bottom: 0.5rem;
+  background: var(--dim2); border-left: 3px solid #ff4444;
+  border-radius: 2px; font-size: 0.8rem;
+}
+
+.error-item-filename {
+  font-weight: bold; color: var(--fg); margin-bottom: 0.2rem;
+}
+
+.error-item-message {
+  color: #ddd; font-size: 0.75rem;
+}
+
+.error-item-hint {
+  color: #999; font-size: 0.7rem; margin-top: 0.2rem; font-style: italic;
+}
+
+.error-modal-tips {
+  background: var(--dim2); padding: 0.75rem;
+  border-left: 3px solid #ff9900; border-radius: 2px;
+  margin-top: 1rem; font-size: 0.8rem;
+}
+
+.error-modal-tips-title {
+  font-weight: bold; color: #ff9900; margin-bottom: 0.3rem;
+}
+
+.error-modal-tips ul {
+  margin: 0; padding-left: 1.2rem;
+}
+
+.error-modal-tips li {
+  color: #ccc; margin-bottom: 0.2rem;
+}
+
+.error-modal-footer {
+  padding: 1rem; border-top: 1px solid var(--border);
+  display: flex; gap: 0.75rem; justify-content: flex-end;
+}
+
+.btn-secondary {
+  background: var(--dim2); color: var(--fg);
+  border: 1px solid var(--border); padding: 0.5rem 1rem;
+  border-radius: 2px; cursor: pointer; font-size: 0.85rem;
+  transition: background 0.15s;
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
 </style>
 {% endblock %}
 
@@ -39,6 +133,23 @@
 <div class="admin-page-title">
   <span>// UPLOAD MEDIA</span>
   <a href="/admin/media" class="btn btn-sm">← Library</a>
+</div>
+
+<!-- Error Modal -->
+<div class="error-modal-overlay" id="errorModal">
+  <div class="error-modal">
+    <div class="error-modal-header">
+      <span>⚠️ Upload Issues</span>
+      <button class="error-modal-close" onclick="closeErrorModal()">✕</button>
+    </div>
+    <div class="error-modal-content" id="errorModalContent">
+      <!-- Populated by JavaScript -->
+    </div>
+    <div class="error-modal-footer">
+      <button class="btn-secondary" onclick="closeErrorModal()">Dismiss</button>
+      <button class="btn btn-primary" onclick="retryFailedUploads()">Retry Failed</button>
+    </div>
+  </div>
 </div>
 
 <div id="upload-app" style="max-width:700px;">
@@ -99,9 +210,63 @@ const overallBar = document.getElementById('overallBar');
 const progressText = document.getElementById('progressText');
 const progressPct  = document.getElementById('progressPct');
 const uploadStatus = document.getElementById('uploadStatus');
+const errorModal = document.getElementById('errorModal');
+const errorModalContent = document.getElementById('errorModalContent');
 
 let selectedFiles = [];
 let isUploading   = false;
+let uploadErrors  = [];
+let failedIndexes = [];
+
+const VALID_EXTENSIONS = [
+  'jpg', 'jpeg', 'png', 'webp', 'heic', 'gif', 'mp4', 'mov', 'mp3', 'flac'
+];
+const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
+const MAX_BATCH_SIZE = 10 * 1024 * 1024 * 1024; // 10GB
+
+// ─── Error Code Explanations ───────────────────────────────────
+const ERROR_MESSAGES = {
+  'INVALID_FILE_TYPE': {
+    short: 'Unsupported file format',
+    hint: 'Try uploading JPG, PNG, MP4, MOV, or other supported formats'
+  },
+  'FILE_TOO_LARGE': {
+    short: 'File exceeds 5GB limit',
+    hint: 'Split large videos into smaller parts or compress first'
+  },
+  'DISK_FULL': {
+    short: 'Server storage is full',
+    hint: 'This is a server issue. Try again later or contact the administrator'
+  },
+  'FILE_WRITE_ERROR': {
+    short: 'Failed to save file',
+    hint: 'Permission or storage error on server. Try again later'
+  },
+  'ALBUM_NOT_FOUND': {
+    short: 'Album does not exist',
+    hint: 'The album may have been deleted. Try without assigning to an album'
+  },
+  'CANNOT_CREATE_DIRECTORY': {
+    short: 'Server storage error',
+    hint: 'The server cannot access storage. Contact administrator'
+  },
+  'DATABASE_ERROR': {
+    short: 'Failed to save record',
+    hint: 'Database error on server. Try again or contact administrator'
+  },
+  'UNAUTHORIZED': {
+    short: 'Session expired',
+    hint: 'Your login session expired. Please refresh and login again'
+  },
+  'NETWORK_ERROR': {
+    short: 'Network connection lost',
+    hint: 'Check your internet connection and try again'
+  },
+  'SERVER_ERROR': {
+    short: 'Server error',
+    hint: 'An unexpected server error occurred. Try again later'
+  }
+};
 
 // ─── File selection ───────────────────────────────────────────
 fileInput.addEventListener('change', () => setFiles(Array.from(fileInput.files)));
@@ -118,18 +283,82 @@ dropZone.addEventListener('drop', e => {
 
 function setFiles(files) {
   selectedFiles = files;
+  uploadErrors = [];
+  failedIndexes = [];
+  
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+  const totalGB = totalSize / (1024 * 1024 * 1024);
+  
+  // Validate files before allowing upload
+  let validationErrors = validateFiles(files);
+  
   dropLabel.textContent = files.length === 0
     ? 'DRAG FILES HERE or CLICK TO SELECT'
-    : `${files.length} file${files.length > 1 ? 's' : ''} selected`;
+    : `${files.length} file${files.length > 1 ? 's' : ''} selected (${fmt(totalSize)})`;
   dropZone.classList.toggle('has-files', files.length > 0);
-  startBtn.disabled = files.length === 0;
+  
+  if (validationErrors.length > 0) {
+    uploadStatus.textContent = `⚠️ ${validationErrors.length} issue${validationErrors.length > 1 ? 's' : ''} found`;
+    uploadStatus.style.color = '#ff4444';
+    uploadErrors = validationErrors;
+  } else if (totalGB > 5) {
+    uploadStatus.textContent = `⚠️ Large upload (${totalGB.toFixed(1)}GB) — may take a while`;
+    uploadStatus.style.color = '#ff9900';
+  } else {
+    uploadStatus.textContent = '';
+  }
+  
+  startBtn.disabled = files.length === 0 || validationErrors.length > 0;
   renderQueue();
+}
+
+function validateFiles(files) {
+  const errors = [];
+  let totalSize = 0;
+  
+  files.forEach((f, idx) => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    
+    // Check file type
+    if (!VALID_EXTENSIONS.includes(ext)) {
+      errors.push({
+        code: 'INVALID_FILE_TYPE',
+        filename: f.name,
+        index: idx,
+        severity: 'error'
+      });
+    }
+    
+    // Check individual file size
+    if (f.size > MAX_FILE_SIZE) {
+      errors.push({
+        code: 'FILE_TOO_LARGE',
+        filename: f.name,
+        index: idx,
+        severity: 'error'
+      });
+    }
+    
+    totalSize += f.size;
+  });
+  
+  // Check total batch size
+  if (totalSize > MAX_BATCH_SIZE) {
+    errors.push({
+      code: 'BATCH_TOO_LARGE',
+      severity: 'warning',
+      message: `Total size (${fmt(totalSize)}) exceeds 10GB. Consider uploading in smaller batches.`
+    });
+  }
+  
+  return errors;
 }
 
 function fmt(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
-  return (bytes/1048576).toFixed(1) + ' MB';
+  if (bytes < 1024*1024*1024) return (bytes/1048576).toFixed(1) + ' MB';
+  return (bytes/(1024*1024*1024)).toFixed(1) + ' GB';
 }
 
 function renderQueue() {
@@ -139,10 +368,16 @@ function renderQueue() {
     const div = document.createElement('div');
     div.className = 'file-queue-item';
     div.id = `qi-${i}`;
+    
+    // Check if this file has validation errors
+    const fileErrors = uploadErrors.filter(e => e.index === i);
+    const statusClass = fileErrors.length > 0 ? 'error' : 'pending';
+    const statusText = fileErrors.length > 0 ? '✕ invalid' : '—';
+    
     div.innerHTML = `
       <span class="fname" title="${f.name}">${f.name}</span>
       <span class="fsize">${fmt(f.size)}</span>
-      <span class="fstatus pending" id="qs-${i}">—</span>
+      <span class="fstatus ${statusClass}" id="qs-${i}">${statusText}</span>
     `;
     fileQueue.appendChild(div);
   });
@@ -151,9 +386,18 @@ function renderQueue() {
 // ─── Sequential upload ────────────────────────────────────────
 startBtn.addEventListener('click', async () => {
   if (isUploading || !selectedFiles.length) return;
+  
+  // Clear errors and show any validation issues first
+  if (uploadErrors.length > 0) {
+    showErrorModal();
+    return;
+  }
+  
   isUploading = true;
   startBtn.disabled = true;
   uploadStatus.textContent = '';
+  uploadErrors = [];
+  failedIndexes = [];
 
   const albumId = document.getElementById('albumSelect').value;
   overallProgress.style.display = '';
@@ -175,16 +419,33 @@ startBtn.addEventListener('click', async () => {
     try {
       const resp = await fetch('/admin/api/upload/single', { method: 'POST', body: fd });
       const data = await resp.json();
+      
       if (data.status === 'queued') {
         qs.textContent = '✓ queued'; qs.className = 'fstatus done';
         done++;
       } else {
-        qs.textContent = '! ' + (data.message || 'error'); qs.className = 'fstatus error';
+        // Server returned an error with code
+        uploadErrors.push({
+          code: data.code || 'SERVER_ERROR',
+          filename: f.name,
+          index: i,
+          message: data.message,
+          severity: 'error'
+        });
+        qs.textContent = '✕ error'; qs.className = 'fstatus error';
         errors++;
+        failedIndexes.push(i);
       }
     } catch(e) {
-      qs.textContent = '! network error'; qs.className = 'fstatus error';
+      uploadErrors.push({
+        code: 'NETWORK_ERROR',
+        filename: f.name,
+        index: i,
+        severity: 'error'
+      });
+      qs.textContent = '✕ network'; qs.className = 'fstatus error';
       errors++;
+      failedIndexes.push(i);
     }
 
     const pct = Math.round(((i+1)/total)*100);
@@ -194,18 +455,141 @@ startBtn.addEventListener('click', async () => {
   }
 
   isUploading = false;
-  const msg = errors === 0
-    ? `✓ All ${done} file${done > 1 ? 's' : ''} uploaded`
-    : `${done} ok, ${errors} error${errors > 1 ? 's' : ''}`;
-  uploadStatus.textContent = msg;
-  uploadStatus.style.color = errors === 0 ? 'var(--fg)' : '#ff4444';
-
+  
   if (errors === 0) {
+    const msg = `✓ All ${done} file${done > 1 ? 's' : ''} uploaded`;
+    uploadStatus.textContent = msg;
+    uploadStatus.style.color = 'var(--fg)';
     // Small delay then redirect to media library
     setTimeout(() => { window.location.href = albumId ? `/admin/albums/${albumId}` : '/admin/media'; }, 1200);
   } else {
+    const msg = errors === 1
+      ? `${done} ok, 1 error`
+      : `${done} ok, ${errors} errors`;
+    uploadStatus.textContent = msg;
+    uploadStatus.style.color = '#ff4444';
     startBtn.disabled = false;
+    
+    // Show error modal
+    if (uploadErrors.length > 0) {
+      setTimeout(showErrorModal, 400);
+    }
   }
+});
+
+// ─── Error Modal ───────────────────────────────────────────────
+function showErrorModal() {
+  errorModalContent.innerHTML = '';
+  
+  // Categorize errors
+  const validationErrors = uploadErrors.filter(e => !e.filename || e.code === 'INVALID_FILE_TYPE' || e.code === 'FILE_TOO_LARGE');
+  const uploadFailures = uploadErrors.filter(e => e.filename && e.code !== 'INVALID_FILE_TYPE' && e.code !== 'FILE_TOO_LARGE');
+  const warnings = uploadErrors.filter(e => e.severity === 'warning');
+  
+  // Validation errors section
+  if (validationErrors.length > 0) {
+    const section = document.createElement('div');
+    section.className = 'error-section';
+    section.innerHTML = `<div class="error-section-title">❌ Validation Issues (${validationErrors.length})</div>`;
+    
+    validationErrors.forEach(err => {
+      const item = document.createElement('div');
+      item.className = 'error-item';
+      const info = ERROR_MESSAGES[err.code] || {};
+      item.innerHTML = `
+        <div class="error-item-filename">${err.filename}</div>
+        <div class="error-item-message">${info.short || err.message}</div>
+        <div class="error-item-hint">${info.hint || ''}</div>
+      `;
+      section.appendChild(item);
+    });
+    
+    errorModalContent.appendChild(section);
+  }
+  
+  // Upload failures section
+  if (uploadFailures.length > 0) {
+    const section = document.createElement('div');
+    section.className = 'error-section';
+    section.innerHTML = `<div class="error-section-title">❌ Upload Failures (${uploadFailures.length})</div>`;
+    
+    uploadFailures.forEach(err => {
+      const item = document.createElement('div');
+      item.className = 'error-item';
+      const info = ERROR_MESSAGES[err.code] || {};
+      item.innerHTML = `
+        <div class="error-item-filename">${err.filename}</div>
+        <div class="error-item-message">${info.short || err.message}</div>
+        <div class="error-item-hint">${info.hint || ''}</div>
+      `;
+      section.appendChild(item);
+    });
+    
+    errorModalContent.appendChild(section);
+  }
+  
+  // Warnings section
+  if (warnings.length > 0) {
+    const section = document.createElement('div');
+    section.className = 'error-section';
+    section.innerHTML = `<div class="error-section-title" style="color:#ff9900;">⚠️ Warnings</div>`;
+    
+    warnings.forEach(err => {
+      const item = document.createElement('div');
+      item.className = 'error-item';
+      item.style.borderLeftColor = '#ff9900';
+      item.innerHTML = `
+        <div class="error-item-message">${err.message}</div>
+      `;
+      section.appendChild(item);
+    });
+    
+    errorModalContent.appendChild(section);
+  }
+  
+  // Tips section
+  const tips = document.createElement('div');
+  tips.className = 'error-modal-tips';
+  tips.innerHTML = `
+    <div class="error-modal-tips-title">💡 Tips to fix issues:</div>
+    <ul>
+      <li>Use supported formats: JPG, PNG, WEBP, MP4, MOV, MP3, FLAC</li>
+      <li>Keep individual files under 5GB</li>
+      <li>Upload in batches under 10GB total</li>
+      <li>Check your internet connection for timeouts</li>
+      <li>If disk full, contact administrator</li>
+    </ul>
+  `;
+  errorModalContent.appendChild(tips);
+  
+  errorModal.classList.add('visible');
+}
+
+function closeErrorModal() {
+  errorModal.classList.remove('visible');
+}
+
+function retryFailedUploads() {
+  closeErrorModal();
+  
+  if (failedIndexes.length === 0) {
+    // No failed uploads, just close
+    return;
+  }
+  
+  // Filter selectedFiles to only failed ones
+  const failedFiles = failedIndexes.map(i => selectedFiles[i]);
+  setFiles(failedFiles);
+  
+  if (uploadErrors.filter(e => !e.filename || e.code === 'INVALID_FILE_TYPE' || e.code === 'FILE_TOO_LARGE').length === 0) {
+    // No validation errors left, start upload
+    startBtn.click();
+  }
+}
+
+// Close modal when clicking outside
+errorModal.addEventListener('click', (e) => {
+  if (e.target === errorModal) closeErrorModal();
 });
 </script>
 {% endblock %}

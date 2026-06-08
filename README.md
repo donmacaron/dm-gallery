@@ -123,10 +123,10 @@ data/
 
 - [x] **Phase 1** — Foundation: Docker, DB, auth, basic public gallery ✔
 - [x] **Phase 2** — Media Engine: upload, Pillow/ffmpeg, background jobs, albums CRUD ✔
-- [ ] **Phase 3** — Admin: folder import, ZIP pre-builder, bulk select/create album
-- [ ] **Phase 4** — Content: Quill.js rich text pages, menu manager, settings UI
-- [ ] **Phase 5** — Public Frontend: full CRT theme, lightbox polish
-- [ ] **Phase 6** — Polish: lazy loading, SEO, mobile swipe, orphan cleanup
+- [x] **Phase 3** — Admin: folder import, ZIP pre-builder, bulk select/create album
+- [x] **Phase 4** — Content: Quill.js rich text pages, menu manager, settings UI
+- [x] **Phase 5** — Public Frontend: full CRT theme, lightbox polish
+- [x] **Phase 6** — Polish: lazy loading, SEO, mobile swipe, orphan cleanup
 
 ---
 

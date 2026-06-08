@@ -11,6 +11,8 @@ __pycache__/
 build/
 dist/
 *.egg-info/
+analyze_refs.py
+list_refs.py
 
 # ── Virtual envs ──
 venv/
@@ -56,3 +58,5 @@ migrations/__pycache__/
 *.tmp
 *.bak
 *.orig
+
+ref_analysis.json
