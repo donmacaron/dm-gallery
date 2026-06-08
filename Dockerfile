@@ -20,4 +20,5 @@ COPY alembic.ini .
 RUN mkdir -p /app/data/media /app/data/db /app/data/zips /app/data/originals
 
 # Run DB migrations then start the server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1"]
+# Increased timeout (600s) for large file uploads, 2 workers for better concurrency
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --timeout-keep-alive 600 --timeout-notify 600"]

@@ -30,6 +30,8 @@ services:
       - "traefik.http.routers.dm-gallery1.entrypoints=webs"
       - "traefik.http.routers.dm-gallery1.tls.certresolver=myresolver"
       - "traefik.http.services.dm-gallery1.loadbalancer.server.port=8000"
+      # Increase timeouts for large file uploads (10 minutes)
+      - "traefik.http.services.dm-gallery1.loadbalancer.serversTransport=upload-transport"
       # HTTP → HTTPS redirect router
       - "traefik.http.routers.dm-gallery2.rule=Host(`donmacaron.net`)"
       - "traefik.http.routers.dm-gallery2.entrypoints=web"

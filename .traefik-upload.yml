@@ -1,0 +1,12 @@
+# Traefik configuration for large file uploads
+# Merge this into your Traefik config if needed
+
+serversTransport:
+  upload-transport:
+    # 10 minute timeout for large file uploads
+    respondingTimeouts:
+      idleConnTimeout: 600s
+      readTimeout: 600s
+      writeTimeout: 600s
+    dialTimeout: 30s
+    dialKeepAlive: 30s

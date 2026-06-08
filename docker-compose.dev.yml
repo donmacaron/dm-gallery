@@ -16,7 +16,7 @@ services:
       - ${ORIGINALS_PATH:-./data/originals}:/app/data/originals
     ports:
       - "8000:8000"             # Expose directly (no nginx in dev)
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --timeout-keep-alive 600 --timeout-notify 600
 
   nginx:
     profiles:
