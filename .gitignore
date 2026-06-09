@@ -60,3 +60,4 @@ migrations/__pycache__/
 *.orig
 
 ref_analysis.json
+.traefik-upload.yml
