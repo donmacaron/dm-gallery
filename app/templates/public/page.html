@@ -30,6 +30,71 @@
   cursor:pointer;
 }
 .page-content img:hover { border-color:var(--accent); }
+
+/* ── Album card embed (Polaroid style) ── */
+.album-card-embed {
+  display: inline-block;
+  max-width: 260px;
+  width: 100%;
+  text-decoration: none;
+  margin: 0.5rem 0.75rem 0.5rem 0;
+  vertical-align: top;
+  /* Polaroid frame */
+  background: #f2f0eb;
+  padding: 12px 12px 0 12px;
+  /* Subtle shadow for depth */
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.25),
+    0 1px 3px rgba(0,0,0,0.15);
+  /* Slight random tilt for organic feel */
+  transform: rotate(-1.2deg);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.album-card-embed:hover {
+  transform: rotate(0deg) translateY(-3px);
+  box-shadow:
+    0 8px 24px rgba(0,0,0,0.35),
+    0 2px 6px rgba(0,0,0,0.2);
+}
+.album-card-embed-img {
+  width: 100%;
+  overflow: hidden;
+}
+.album-card-embed-img img {
+  width: 100%;
+  height: auto;
+  display: block;
+  margin: 0;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+.album-card-embed:hover .album-card-embed-img img {
+  transform: scale(1.03);
+}
+.album-card-embed-img .album-card-no-img {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
+  font-size: 1.5rem;
+}
+/* Thick white bottom strip — the Polaroid caption area */
+.album-card-embed-title {
+  padding: 14px 4px 16px 4px;
+  font-size: 0.88rem;
+  font-family: 'Share Tech Mono', monospace;
+  color: #1a1a1a;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+}
+
 </style>
 {% endblock %}
 

@@ -135,6 +135,54 @@
 .cover-item:hover  { border-color: var(--border2); }
 .cover-item.active { border-color: var(--accent); }
 .cover-item img    { width:100%; height:100%; object-fit:cover; display:block; }
+
+/* ── Photo resize in editor ── */
+.ql-editor img {
+  max-width: 100%;
+  cursor: pointer;
+  transition: outline 0.1s;
+}
+.ql-editor img.img-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.img-size-bar {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+  padding: 0.4rem 0;
+}
+.img-size-bar.visible {
+  display: flex;
+}
+.img-size-bar label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #555;
+  white-space: nowrap;
+}
+.img-size-btn {
+  background: none;
+  border: 1px solid #333;
+  color: #555;
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: 'Share Tech Mono', monospace;
+  transition: all 0.12s;
+}
+.img-size-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.img-size-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255,102,0,0.08);
+}
+
 </style>
 {% endblock %}
 
@@ -225,6 +273,15 @@
       </span>
     </div>
     <div id="editor-container"></div>
+
+    <!-- Photo resize bar (appears when image is selected) -->
+    <div class="img-size-bar" id="imgSizeBar">
+      <label>Image Size:</label>
+      <button type="button" class="img-size-btn" data-size="25" onclick="setImgSize(25)">25%</button>
+      <button type="button" class="img-size-btn" data-size="50" onclick="setImgSize(50)">50%</button>
+      <button type="button" class="img-size-btn" data-size="75" onclick="setImgSize(75)">75%</button>
+      <button type="button" class="img-size-btn" data-size="100" onclick="setImgSize(100)">100%</button>
+    </div>
   </div>
 
   <input type="hidden" name="content_html"  id="content_html">

@@ -17,28 +17,18 @@ _ALBUM_SHORTCODE = re.compile(r'\[\[album:(\d+)\]\]')
 
 
 def _render_album_card(album: Album) -> str:
-    """Render an album shortcode as an HTML card."""
+    """Render an album shortcode as a clean card."""
     cover_html = (
         f'<img src="/media/{album.cover_thumb_path}" '
         f'alt="{album.title}" '
-        f'style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block;">'
+        f'loading="lazy">'
         if album.cover_thumb_path else
-        '<div style="width:100%;aspect-ratio:4/3;background:#111;display:flex;'
-        'align-items:center;justify-content:center;color:#333;font-size:0.65rem;">&#9633;</div>'
+        '<div class="album-card-no-img">&#9633;</div>'
     )
     return (
-        f'<a href="/a/{album.slug}" '
-        f'style="display:inline-block;max-width:280px;width:100%;'
-        f'border:1px solid var(--border);text-decoration:none;'
-        f'transition:border-color 0.15s;vertical-align:top;" '
-        f'onmouseover="this.style.borderColor=\'var(--accent)\'" '
-        f'onmouseout="this.style.borderColor=\'var(--border)\'" '
-        f'title="{album.title}">'
-        f'{cover_html}'
-        f'<div style="padding:6px 8px;font-size:0.82rem;color:var(--fg);'
-        f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
-        f'background:rgba(0,0,0,0.6);">'
-        f'{album.title}</div>'
+        f'<a href="/a/{album.slug}" class="album-card-embed" title="{album.title}">'
+        f'<div class="album-card-embed-img">{cover_html}</div>'
+        f'<div class="album-card-embed-title">{album.title}</div>'
         f'</a>'
     )
 

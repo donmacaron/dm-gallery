@@ -163,3 +163,49 @@ body      { background: var(--admin-bg); }
 /* ─ HTMX indicator ──────────────────────────────────────── */
 .htmx-indicator { display: none; }
 .htmx-request .htmx-indicator { display: inline; }
+
+/* ── Disable CRT scanlines + vignette in admin panel ── */
+body::before,
+body::after {
+  content: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Disable CRT text glow in admin ── */
+h1, h2, h3, h4,
+.admin-page-title,
+.admin-page-title span,
+.site-logo,
+.site-logo .logo-text {
+  text-shadow: none !important;
+}
+
+/* ── Thumb size slider bar ── */
+.thumb-size-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+}
+.thumb-size-bar label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #555;
+  white-space: nowrap;
+}
+.thumb-size-bar input[type="range"] {
+  flex: 1;
+  max-width: 220px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  height: 4px;
+}
+.thumb-size-bar .size-val {
+  font-size: 0.72rem;
+  color: var(--accent);
+  min-width: 40px;
+  font-family: 'Share Tech Mono', monospace;
+}

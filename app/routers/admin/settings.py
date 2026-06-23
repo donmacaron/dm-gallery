@@ -42,6 +42,11 @@ SETTINGS_GROUPS = [
         ("theme_scanline_opacity", "text",  "Scanline Opacity (0.0 \u2013 0.3)"),
         ("theme_font",             "text",  "Primary Font (Google Fonts name)"),
     ]),
+    ("Footer", [
+        ("footer_bg_color",     "color", "Footer Background Color"),
+        ("footer_fg_color",     "color", "Footer Text Color"),
+        ("footer_border_color", "color", "Footer Border / Divider Color"),
+    ]),
 ]
 
 

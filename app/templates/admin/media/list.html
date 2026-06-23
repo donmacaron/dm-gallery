@@ -134,6 +134,16 @@
 
 {% if media_items %}
 
+
+<!-- ── Thumbnail Size Slider ── -->
+<div class="thumb-size-bar">
+  <label>Thumb Size:</label>
+  <input type="range" id="thumbSizeSlider" min="60" max="320" value="140" step="10">
+  <span class="size-val" id="thumbSizeValue">140px</span>
+</div>
+<!-- ── End Thumbnail Size Slider ── -->
+
+
 <!-- Photo grid -->
 <div class="media-grid-admin" id="mediaGridAdmin">
   {% for item in media_items %}
@@ -212,6 +222,25 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+// Thumbnail size slider
+(function() {
+  var KEY = 'dm_admin_thumb_size';
+  var slider = document.getElementById('thumbSizeSlider');
+  var label  = document.getElementById('thumbSizeValue');
+  var grid   = document.getElementById('mediaGridAdmin');
+  if (!slider || !grid) return;
+  function applySize(val) {
+    grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(' + val + 'px, 1fr))';
+    label.textContent = val + 'px';
+    slider.value = val;
+    try { localStorage.setItem(KEY, val); } catch(e) {}
+  }
+  // Restore saved size on load
+  try { var saved = localStorage.getItem(KEY); if (saved) applySize(parseInt(saved)); } catch(e) {}
+  slider.addEventListener('input', function() { applySize(this.value); });
+})();
+</script>
 <script>
 let selected = new Set();
 

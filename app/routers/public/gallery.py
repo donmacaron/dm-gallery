@@ -43,6 +43,9 @@ def get_site_ctx(db: Session) -> dict:
     ctx.setdefault("homepage_page_id",         "")
     ctx.setdefault("homepage_photo_id",        "")
     ctx.setdefault("homepage_rotation",        "reload")
+    ctx.setdefault("footer_bg_color",          "")
+    ctx.setdefault("footer_fg_color",          "")
+    ctx.setdefault("footer_border_color",      "")
     return ctx
 
 

@@ -31,6 +31,27 @@
       --header-fg: {{ h_fg if h_fg else 'var(--fg)' }};
     }
   </style>
+
+  {# ── Footer color customization ── #}
+  {%- set f_bg = site.get('footer_bg_color', '') | trim %}
+  {%- set f_fg = site.get('footer_fg_color', '') | trim %}
+  {%- set f_bd = site.get('footer_border_color', '') | trim %}
+  {% if f_bg or f_fg or f_bd %}
+  <style>
+    .site-footer {
+      {% if f_bg %}background-color: {{ f_bg }} !important;{% endif %}
+      {% if f_fg %}color: {{ f_fg }} !important;{% endif %}
+      {% if f_bd %}border-top-color: {{ f_bd }} !important;{% endif %}
+    }
+    {% if f_fg %}
+    .site-footer a,
+    .site-footer .social-link,
+    .site-footer .footer-copy {
+      color: {{ f_fg }} !important;
+    }
+    {% endif %}
+  </style>
+  {% endif %}
 </head>
 
 {#

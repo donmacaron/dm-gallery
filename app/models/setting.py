@@ -37,4 +37,8 @@ DEFAULT_SETTINGS = {
     "homepage_page_id":       ("",            "Page ID to display on homepage (page mode)"),
     "homepage_photo_id":      ("",            "Specific photo media ID (specific_photo mode)"),
     "homepage_rotation":      ("reload",      "Photo rotation: reload / daily / weekly / monthly"),
+    # Footer
+    "footer_bg_color":     ("",        "Footer background color (empty = match header)"),
+    "footer_fg_color":     ("",        "Footer text color (empty = match header)"),
+    "footer_border_color": ("",        "Footer top border color (empty = match header)"),
 }
